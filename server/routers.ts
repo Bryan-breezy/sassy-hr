@@ -20,7 +20,7 @@ export const routePlanInputSchema = z.object(
   { 
     weekStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), 
     totalCost: z.number().min(0).max(1000000), 
-    dailyRoutes: z.array(dailyRouteSchema).min(1).max(7) 
+    dailyRoutes: z.array(dailyRouteSchema).min(1).max(49) 
   }
 )
 
