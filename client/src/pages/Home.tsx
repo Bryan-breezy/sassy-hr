@@ -160,21 +160,21 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#f6f7f4] text-[#18352f]">
       <header className="border-b border-[#dfe7df] bg-[#f6f7f4]/90 backdrop-blur sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div>
-              <div className="font-semibold tracking-tight text-lg">Sassy Cosmetic &amp; Beauty Products (K) Limited</div>
-              <div className="text-xs text-[#6d8075]">Merchandiser route planning</div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 sm:h-20 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="min-w-0">
+              <div className="font-semibold tracking-tight text-sm sm:text-lg leading-tight truncate">Sassy Cosmetic &amp; Beauty Products (K) Limited</div>
+              <div className="text-[11px] sm:text-xs text-[#6d8075] truncate">Merchandiser route planning</div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {user?.role === "admin" && 
-              <a href="/hr" className="inline-flex items-center px-3 py-1.5 rounded-lg bg-[#8b5e3c] text-white text-xs font-semibold tracking-wide hover:bg-[#6d442d] transition-colors">
+              <a href="/hr" className="inline-flex items-center px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#8b5e3c] text-white text-[11px] sm:text-xs font-semibold tracking-wide hover:bg-[#6d442d] transition-colors whitespace-nowrap">
                 HR Console
               </a>
             }
             {isAuthenticated && <>
-              <div className="hidden sm:block text-right">
+              <div className="hidden md:block text-right">
                 <div className="text-sm font-medium">{user?.name || user?.email}</div>
                 <div className="text-xs text-[#718278]">
                   {user?.role === "admin" ? "HR administrator" : "Merchandiser"}
@@ -188,14 +188,14 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-8 py-8 sm:py-12">
-        <div className="grid lg:grid-cols-[1.05fr_.95fr] gap-8 items-start">
+      <main className="max-w-7xl mx-auto px-4 sm:px-8 py-6 sm:py-12">
+        <div className="grid lg:grid-cols-[1.05fr_.95fr] gap-6 sm:gap-8 items-start">
           <section>
-            <h1 className="mt-5 text-4xl sm:text-6xl leading-[.98] font-semibold tracking-[-.05em] max-w-xl">
+            <h1 className="mt-2 sm:mt-5 text-3xl sm:text-5xl md:text-6xl leading-[1.05] sm:leading-[.98] font-semibold tracking-[-.03em] sm:tracking-[-.05em] max-w-xl">
               Make every visit count.
             </h1>
 
-            <div className="mt-10 grid grid-cols-3 gap-3 max-w-xl">
+            <div className="mt-6 sm:mt-10 grid grid-cols-3 gap-2 sm:gap-3 max-w-xl">
               <Stat label="Active days" value={activeRoutes.length.toString().padStart(2, "0")} />
               <Stat label="Planned cost" value={`Ksh ${totalCost.toFixed(2)}`} />
               <Stat label="Saved plans" value={(mine.data?.length || 0).toString().padStart(2, "0")} />
@@ -296,14 +296,14 @@ export default function Home() {
                 })}
               </div>
 
-              <div className="mt-6 rounded-2xl bg-[#f3f6ef] p-4 flex items-center justify-between">
-                <div>
+              <div className="mt-6 rounded-2xl bg-[#f3f6ef] p-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
                   <div className="text-xs uppercase tracking-[.13em] text-[#75877b]">Total estimated cost</div>
-                  <div className="text-2xl font-semibold mt-1">Ksh {totalCost.toFixed(2)}</div>
+                  <div className="text-xl sm:text-2xl font-semibold mt-1 truncate">Ksh {totalCost.toFixed(2)}</div>
                 </div>
                 <div className="text-right">
                   <div className="text-xs uppercase tracking-[.13em] text-[#75877b]">Days planned</div>
-                  <div className="text-xl font-semibold mt-1 text-[#143f37]">
+                  <div className="text-lg sm:text-xl font-semibold mt-1 text-[#143f37]">
                     {activeRoutes.length} of 7
                   </div>
                 </div>
@@ -345,9 +345,9 @@ export default function Home() {
 
 function Stat({ label, value }: { label: string; value: string }) { 
   return (
-    <div className="rounded-2xl bg-white border border-[#e5ebe3] p-4">
-      <div className="text-xl font-semibold tracking-tight">{value}</div>
-      <div className="text-xs text-[#7b8a81] mt-1">{label}</div>
+    <div className="rounded-2xl bg-white border border-[#e5ebe3] p-2.5 sm:p-4 min-w-0">
+      <div className="text-base sm:text-xl font-semibold tracking-tight truncate" title={value}>{value}</div>
+      <div className="text-[10px] sm:text-xs text-[#7b8a81] mt-1 truncate">{label}</div>
     </div> 
   )
 }
@@ -452,20 +452,20 @@ function PlanRow({ plan, openPlan, setOpenPlan }: {
   return (
     <div className="p-5 sm:px-7">
       <button
-        className="w-full text-left flex items-center justify-between gap-4"
+        className="w-full text-left flex items-start sm:items-center justify-between gap-3 sm:gap-4"
         onClick={() => setOpenPlan(openPlan === plan.id ? null : plan.id)}
       >
-        <div>
-          <div className="font-semibold">Week commencing {plan.weekStart}</div>
-          <div className="text-sm text-[#7b8a81] mt-1">
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold truncate">Week commencing {plan.weekStart}</div>
+          <div className="text-xs sm:text-sm text-[#7b8a81] mt-1">
             {routes.length} route day{routes.length === 1 ? "" : "s"} · Ksh {Number(plan.totalCost).toFixed(2)} estimated
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className={`rounded-full px-3 py-1 text-xs font-medium ${plan.status === "reviewed" ? "bg-[#e4f0e2] text-[#4c7755]" : "bg-[#f6eadf] text-[#9a623e]"}`}>
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <span className={`rounded-full px-2.5 sm:px-3 py-1 text-xs font-medium whitespace-nowrap ${plan.status === "reviewed" ? "bg-[#e4f0e2] text-[#4c7755]" : "bg-[#f6eadf] text-[#9a623e]"}`}>
             {plan.status}
           </span>
-          <ChevronDown size={17} className={`text-[#8a978e] transition-transform ${openPlan === plan.id ? "rotate-180" : ""}`} />
+          <ChevronDown size={17} className={`text-[#8a978e] transition-transform shrink-0 ${openPlan === plan.id ? "rotate-180" : ""}`} />
         </div>
       </button>
       {openPlan === plan.id && (
