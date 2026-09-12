@@ -8,7 +8,7 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { validateGoogleSheetsConfig } from "../db";
 import { createContext } from "./context";
-import { serveStatic } from "./vite";
+import { serveStatic } from "./static";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -60,9 +60,14 @@ async function buildApp(): Promise<Express> {
     serveStatic(app);
   }
 
-  // Simple health check so we can verify the function boots
+  // Health check to verify the function boots
   app.get("/api/health", (_req, res) => {
-    res.json({ ok: true, env: process.env.NODE_ENV, vercel: !!process.env.VERCEL });
+    res.json({
+      ok: true,
+      env: process.env.NODE_ENV,
+      vercel: !!process.env.VERCEL,
+      hasGoogleScript: !!(process.env.GOOGLE_APPS_SCRIPT_URL && process.env.GOOGLE_APPS_SCRIPT_TOKEN),
+    });
   });
 
   return app;
