@@ -1,0 +1,27 @@
+# Project TODO
+
+- [x] Build an elegant, polished mobile-first application shell for weekly route planning
+- [x] Add authenticated merchandizer access and sign-in state handling
+- [x] Add weekly route-plan form organized by Monday through Sunday
+- [x] Add route fields for From, To, planned arrival time, departure time, transport mode, and cost incurred
+- [x] Add validation and accessible mobile-friendly form interactions
+- [x] Add database schema for weekly plans and individual daily route details
+- [x] Add server-side procedures to create and retrieve route-plan submissions
+- [x] Add a merchandizer-facing submission confirmation and own-plan history view
+- [x] Add HR-only dashboard with submitted plan list and route-detail review
+- [x] Add HR role-based access control to dashboard procedures and UI
+- [x] Add Vitest coverage for route-plan validation and authorization behavior
+- [x] Run type checks, tests, and browser visual verification
+- [x] Save final checkpoint and provide the shareable live URL
+- [x] Add client-side validation with inline accessible errors for incomplete day entries, invalid costs/times, and week selection
+- [x] Normalize daily route details into a dedicated related database table and update queries/procedures
+- [x] Add Vitest cases for invalid route-plan inputs and valid submission mapping
+- [x] Render an inline accessible week-start error and catch partially edited days using any changed field
+- [x] Finish normalizing route details end-to-end with structured related-day data instead of serialized JSON dependencies
+- [x] Add a valid submission test that verifies correct daily-route persistence mapping
+- [x] Remove the legacy dailyRoutes JSON column from routePlans with a safe migration
+- [x] Update route-plan insert types and helpers to persist route details only in routePlanDays
+- [x] Create and commit a real migration artifact removing routePlans.dailyRoutes and document the zero-row safety condition
+- [x] Create a distinct HR dashboard experience separate from the merchandizer submission interface
+- [x] Add HR-specific navigation, summary metrics, filters, and review-focused styling
+- [x] Verify merchandizer and HR views remain functional after separation
