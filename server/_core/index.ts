@@ -1,5 +1,5 @@
 import "dotenv/config";
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response } from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -8,7 +8,7 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { validateGoogleSheetsConfig } from "../db";
 import { createContext } from "./context";
-import { serveStatic, setupVite } from "./vite";
+import { serveStatic } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -30,7 +30,6 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function buildApp(): Promise<Express> {
-  // Soft validation so the function can still start and return a clear error page/API response
   try {
     validateGoogleSheetsConfig();
   } catch (err) {
@@ -52,30 +51,51 @@ async function buildApp(): Promise<Express> {
     })
   );
 
-  if (process.env.NODE_ENV === "development") {
+  // Only load Vite in local development — never on Vercel/production
+  if (process.env.NODE_ENV === "development" && !process.env.VERCEL) {
+    const { setupVite } = await import("./vite");
     const server = createServer(app);
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
+  // Simple health check so we can verify the function boots
+  app.get("/api/health", (_req, res) => {
+    res.json({ ok: true, env: process.env.NODE_ENV, vercel: !!process.env.VERCEL });
+  });
+
   return app;
 }
 
-// Shared app instance (used by both local Node and Vercel)
-const appPromise = buildApp();
+let appPromise: Promise<Express> | null = null;
 
-// Vercel serverless expects a default export that is a request handler (Express app works)
-export default async function handler(req: any, res: any) {
-  const app = await appPromise;
-  return app(req, res);
+function getApp(): Promise<Express> {
+  if (!appPromise) {
+    appPromise = buildApp();
+  }
+  return appPromise;
 }
 
-// Local development / traditional hosting: listen on a port
+// Vercel serverless handler
+export default async function handler(req: Request, res: Response) {
+  try {
+    const app = await getApp();
+    return app(req, res);
+  } catch (err) {
+    console.error("[handler]", err);
+    res.status(500).json({
+      error: "Server failed to start",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+// Local development / traditional hosting
 if (!process.env.VERCEL && !process.env.NOW_REGION) {
   (async () => {
     try {
-      const app = await appPromise;
+      const app = await getApp();
       const server = createServer(app);
 
       const preferredPort = parseInt(process.env.PORT || "3000");
