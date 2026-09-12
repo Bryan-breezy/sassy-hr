@@ -96,14 +96,21 @@ class SDKServer {
     return new Map(Object.entries(parsed));
   }
 
+  private getHeader(req: Request, name: string): string | undefined {
+    const headers = (req as Request & { headers?: Record<string, string | string[] | undefined> }).headers ?? {};
+    const value = headers[name] ?? headers[name.toLowerCase()];
+    if (Array.isArray(value)) return value[0];
+    return typeof value === "string" ? value : undefined;
+  }
+
   async authenticateRequest(req: Request): Promise<User> {
     // 1. Prefer the session cookie.
-    const cookies = this.parseCookies(req.headers.cookie);
+    const cookies = this.parseCookies(this.getHeader(req, "cookie"));
     let sessionToken = cookies.get(COOKIE_NAME);
 
     // 2. Fallback to the Authorization header (Bearer token).
     if (!sessionToken) {
-      const authHeader = req.headers.authorization;
+      const authHeader = this.getHeader(req, "authorization");
       if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
         sessionToken = authHeader.slice(7);
       }
