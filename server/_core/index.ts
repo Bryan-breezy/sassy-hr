@@ -1,5 +1,5 @@
 import "dotenv/config";
-import express from "express";
+import express, { type Express } from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -29,16 +29,21 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
-async function startServer() {
-  validateGoogleSheetsConfig();
+async function buildApp(): Promise<Express> {
+  // Soft validation so the function can still start and return a clear error page/API response
+  try {
+    validateGoogleSheetsConfig();
+  } catch (err) {
+    console.error("[startup]", (err as Error).message);
+  }
+
   const app = express();
-  const server = createServer(app);
-  // Configure body parser with larger size limit for file uploads
+
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerLocalAuthRoutes(app);
-  // tRPC API
+
   app.use(
     "/api/trpc",
     createExpressMiddleware({
@@ -46,23 +51,46 @@ async function startServer() {
       createContext,
     })
   );
-  // development mode uses Vite, production mode uses static files
+
   if (process.env.NODE_ENV === "development") {
+    const server = createServer(app);
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  const preferredPort = parseInt(process.env.PORT || "3000");
-  const port = await findAvailablePort(preferredPort);
-
-  if (port !== preferredPort) {
-    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
-  }
-
-  server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
-  });
+  return app;
 }
 
-startServer().catch(console.error);
+// Shared app instance (used by both local Node and Vercel)
+const appPromise = buildApp();
+
+// Vercel serverless expects a default export that is a request handler (Express app works)
+export default async function handler(req: any, res: any) {
+  const app = await appPromise;
+  return app(req, res);
+}
+
+// Local development / traditional hosting: listen on a port
+if (!process.env.VERCEL && !process.env.NOW_REGION) {
+  (async () => {
+    try {
+      const app = await appPromise;
+      const server = createServer(app);
+
+      const preferredPort = parseInt(process.env.PORT || "3000");
+      const port = await findAvailablePort(preferredPort);
+
+      if (port !== preferredPort) {
+        console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
+      }
+
+      server.listen(port, () => {
+        console.log(`Server running on http://localhost:${port}/`);
+      });
+    } catch (err) {
+      console.error(err);
+      process.exit(1);
+    }
+  })();
+}
