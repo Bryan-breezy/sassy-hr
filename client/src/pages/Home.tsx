@@ -31,6 +31,10 @@ const blankRoute = (): RouteDraft => ({
   cost: "" 
 })
 
+const blankRoutes = (): Record<string, RouteDraft[]> => Object.fromEntries(
+  DAYS.map(day => [day, [blankRoute()]])
+)
+
 function mondayDate() {
   const date = new Date()
   const day = date.getDay()
@@ -42,7 +46,7 @@ function mondayDate() {
 export default function Home() {
   const { user, loading, isAuthenticated, logout } = useAuth({ redirectOnUnauthenticated: true })
   const [weekStart, setWeekStart] = useState(mondayDate)
-  const [routes, setRoutes] = useState<Record<string, RouteDraft>>(() => Object.fromEntries(DAYS.map(day => [day, blankRoute()])))
+  const [routes, setRoutes] = useState<Record<string, RouteDraft[]>>(blankRoutes)
   // Keep track of which days the merchandiser has activated to fill in (starts with Monday active)
   const [activeDays, setActiveDays] = useState<Set<string>>(() => new Set(["Monday"]))
   const [openPlan, setOpenPlan] = useState<number | null>(null)
@@ -52,7 +56,7 @@ export default function Home() {
   const createPlan = trpc.routePlans.create.useMutation({
     onSuccess: () => { 
       toast.success("Successfully submitted to HR") 
-      setRoutes(Object.fromEntries(DAYS.map(day => [day, blankRoute()]))) 
+      setRoutes(blankRoutes()) 
       setActiveDays(new Set(["Monday"]));
       setDayErrors({}); 
       utils.routePlans.mine.invalidate(); 
@@ -65,7 +69,7 @@ export default function Home() {
   // A day is active for submission if it is enabled and the user entered a location or filled fields
   const activeRoutes = useMemo(() => {
     return DAYS.filter(day => activeDays.has(day))
-      .map(day => ({ day, ...routes[day] }))
+      .flatMap(day => routes[day].map(route => ({ day, ...route })))
       .filter(route => route.from.trim() || route.to.trim())
   }, [routes, activeDays])
 
@@ -80,7 +84,7 @@ export default function Home() {
           return current
         }
         next.delete(day)
-        setRoutes(curr => ({ ...curr, [day]: blankRoute() }))
+        setRoutes(curr => ({ ...curr, [day]: [blankRoute()] }))
         setDayErrors(curr => {
           const updated = { ...curr }
           delete updated[day]
@@ -105,27 +109,17 @@ export default function Home() {
     // Only validate days that the merchandiser actually activated and filled in
     DAYS.forEach(day => {
       if (!activeDays.has(day)) return
-      const route = routes[day]
-      const hasAny = 
-        route.from.trim() || 
-        route.to.trim() || 
-        route.cost.trim() || 
-        route.plannedArrival.trim() || 
-        route.departure.trim()
-
-      if (!hasAny) return
-
-      if (!route.from.trim() || !route.to.trim()) {
-        errors[day] = "Add both a starting location and destination."
-      } else if (!route.plannedArrival.trim()) {
-        errors[day] = "Please specify a planned arrival time (e.g. 09:00)."
-      } else if (!route.departure.trim()) {
-        errors[day] = "Please specify a departure time (e.g. 11:30)."
-      } else if (route.departure <= route.plannedArrival) {
-        errors[day] = "Departure time must be later than planned arrival."
-      } else if (route.cost && (!Number.isFinite(Number(route.cost)) || Number(route.cost) < 0)) {
-        errors[day] = "Enter a valid non-negative cost."
-      }
+      routes[day].forEach((route, index) => {
+        const hasAny = route.from.trim() || route.to.trim() || route.cost.trim() || route.plannedArrival.trim() || route.departure.trim()
+        if (!hasAny) return
+        let message = ""
+        if (!route.from.trim() || !route.to.trim()) message = "Add both a starting location and destination."
+        else if (!route.plannedArrival.trim()) message = "Please specify a planned arrival time (e.g. 09:00)."
+        else if (!route.departure.trim()) message = "Please specify a departure time (e.g. 11:30)."
+        else if (route.departure <= route.plannedArrival) message = "Departure time must be later than planned arrival."
+        else if (route.cost && (!Number.isFinite(Number(route.cost)) || Number(route.cost) < 0)) message = "Enter a valid non-negative cost."
+        if (message && !errors[day]) errors[day] = `Entry ${index + 1}: ${message}`
+      })
     })
 
     setDayErrors(errors);
@@ -160,21 +154,21 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#f6f7f4] text-[#18352f]">
       <header className="border-b border-[#dfe7df] bg-[#f6f7f4]/90 backdrop-blur sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 sm:h-20 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="min-w-0">
-              <div className="font-semibold tracking-tight text-sm sm:text-lg leading-tight truncate">Sassy Cosmetic &amp; Beauty Products (K) Limited</div>
-              <div className="text-[11px] sm:text-xs text-[#6d8075] truncate">Merchandiser route planning</div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 sm:h-20 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div>
+              <div className="font-semibold tracking-tight text-base sm:text-lg max-w-[220px] sm:max-w-none truncate">Sassy Cosmetic &amp; Beauty Products (K) Limited</div>
+              <div className="text-[11px] sm:text-xs text-[#6d8075]">Merchandiser route planning</div>
             </div>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-3">
             {user?.role === "admin" && 
-              <a href="/hr" className="inline-flex items-center px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#8b5e3c] text-white text-[11px] sm:text-xs font-semibold tracking-wide hover:bg-[#6d442d] transition-colors whitespace-nowrap">
+              <a href="/hr" className="inline-flex items-center px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#8b5e3c] text-white text-[11px] sm:text-xs font-semibold tracking-wide hover:bg-[#6d442d] transition-colors">
                 HR Console
               </a>
             }
             {isAuthenticated && <>
-              <div className="hidden md:block text-right">
+              <div className="hidden sm:block text-right">
                 <div className="text-sm font-medium">{user?.name || user?.email}</div>
                 <div className="text-xs text-[#718278]">
                   {user?.role === "admin" ? "HR administrator" : "Merchandiser"}
@@ -189,33 +183,35 @@ export default function Home() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-8 py-6 sm:py-12">
-        <div className="grid lg:grid-cols-[1.05fr_.95fr] gap-6 sm:gap-8 items-start">
-          <section>
-            <h1 className="mt-2 sm:mt-5 text-3xl sm:text-5xl md:text-6xl leading-[1.05] sm:leading-[.98] font-semibold tracking-[-.03em] sm:tracking-[-.05em] max-w-xl">
+        <div className="grid lg:grid-cols-[1.05fr_.95fr] gap-6 lg:gap-8 items-start">
+          <section className="order-2 lg:order-1">
+            <p className="text-xs uppercase tracking-[.18em] text-[#8b5e3c] font-semibold">Weekly field plan</p>
+            <h1 className="mt-3 text-4xl sm:text-6xl leading-[.98] font-semibold tracking-[-.05em] max-w-xl">
               Make every visit count.
             </h1>
+            <p className="mt-4 max-w-md text-sm sm:text-base leading-6 text-[#718278]">Plan the places you will visit this week, then send your route directly to HR.</p>
 
-            <div className="mt-6 sm:mt-10 grid grid-cols-3 gap-2 sm:gap-3 max-w-xl">
-              <Stat label="Active days" value={activeRoutes.length.toString().padStart(2, "0")} />
+            <div className="mt-7 sm:mt-10 grid grid-cols-3 gap-2 sm:gap-3 max-w-xl">
+              <Stat label="Planned visits" value={activeRoutes.length.toString().padStart(2, "0")} />
               <Stat label="Planned cost" value={`Ksh ${totalCost.toFixed(2)}`} />
               <Stat label="Saved plans" value={(mine.data?.length || 0).toString().padStart(2, "0")} />
             </div>
 
             {/* Quick Day Selector Helper */}
-            <div className="mt-8 max-w-xl bg-white border border-[#e5ebe3] rounded-2xl p-5">
+            <div className="mt-6 sm:mt-8 max-w-xl bg-white border border-[#e5ebe3] rounded-2xl p-4 sm:p-5">
               <div className="text-xs uppercase tracking-[.14em] text-[#708078] font-semibold">
                 Select days you plan to visit
               </div>
-              <div className="flex flex-wrap gap-2 mt-3">
+              <div className="grid grid-cols-4 sm:flex sm:flex-wrap gap-2 mt-3">
                 {DAYS.map(day => {
                   const isEnabled = activeDays.has(day)
-                  const hasContent = routes[day].from.trim() || routes[day].to.trim()
+                  const hasContent = routes[day].some(route => route.from.trim() || route.to.trim())
                   return (
                     <button
                       key={day}
                       type="button"
                       onClick={() => toggleDay(day)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                      className={`min-h-10 px-2 sm:px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
                         isEnabled
                           ? "bg-[#143f37] text-white shadow-sm"
                           : "bg-[#f1f3ef] text-[#6d7e74] hover:bg-[#e4e8e1]"
@@ -230,7 +226,7 @@ export default function Home() {
             </div>
           </section>
 
-          <Card className="border-0 shadow-[0_18px_60px_rgba(37,68,52,.10)] rounded-[28px] overflow-hidden">
+          <Card className="order-1 lg:order-2 border-0 shadow-[0_18px_60px_rgba(37,68,52,.10)] rounded-[28px] overflow-hidden">
             <CardHeader className="bg-[#143f37] text-[#f2f4e8] p-6 sm:p-8">
               <div className="flex items-center justify-between">
                 <div>
@@ -240,7 +236,7 @@ export default function Home() {
                 <CalendarDays className="text-[#b7cbb3]" />
               </div>
             </CardHeader>
-            <CardContent className="p-5 sm:p-8">
+            <CardContent className="p-4 sm:p-8">
               <Label htmlFor="week-start" className="text-xs uppercase tracking-[.14em] text-[#708078]">Week commencing</Label>
               <Input
                 id="week-start"
@@ -258,7 +254,7 @@ export default function Home() {
               )}
 
               {/* Day Cards */}
-              <div className="mt-6 space-y-4">
+              <div className="mt-5 sm:mt-6 space-y-3 sm:space-y-4">
                 {DAYS.map((day, index) => {
                   const isEnabled = activeDays.has(day)
                   if (!isEnabled) {
@@ -268,8 +264,8 @@ export default function Home() {
                         onClick={() => toggleDay(day)}
                         className="rounded-2xl border border-dashed border-[#d5ded4] p-3 text-center cursor-pointer hover:bg-[#fbfcf9] transition-colors flex items-center justify-between px-4 text-xs font-medium text-[#7a8c81]"
                       >
-                        <span>{day} (Not included)</span>
-                        <span className="inline-flex items-center gap-1 text-[#143f37] font-semibold">
+                        <span className="min-w-0 truncate">{day} (Not included)</span>
+                        <span className="shrink-0 inline-flex items-center gap-1 text-[#143f37] font-semibold">
                           <Plus size={14} /> Add {day}
                         </span>
                       </div>
@@ -281,14 +277,20 @@ export default function Home() {
                       key={day}
                       day={day}
                       index={index}
-                      route={routes[day]}
+                      routes={routes[day]}
                       error={dayErrors[day]}
                       onRemove={() => toggleDay(day)}
                       canRemove={activeDays.size > 1}
-                      onChange={(field, value) => {
+                      onRemoveVisit={routeIndex => setRoutes(current => ({
+                        ...current,
+                        [day]: current[day].filter((_, index) => index !== routeIndex),
+                      }))}
+                      onChange={(routeIndex, field, value) => {
                         setRoutes(current => ({
                           ...current,
-                          [day]: { ...current[day], [field]: value },
+                          [day]: routeIndex >= current[day].length
+                            ? [...current[day], { ...blankRoute(), [field]: value }]
+                            : current[day].map((route, index) => index === routeIndex ? { ...route, [field]: value } : route),
                         }));
                       }}
                     />
@@ -296,27 +298,29 @@ export default function Home() {
                 })}
               </div>
 
-              <div className="mt-6 rounded-2xl bg-[#f3f6ef] p-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="mt-5 rounded-2xl bg-[#f3f6ef] p-3.5 sm:p-4 flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-xs uppercase tracking-[.13em] text-[#75877b]">Total estimated cost</div>
-                  <div className="text-xl sm:text-2xl font-semibold mt-1 truncate">Ksh {totalCost.toFixed(2)}</div>
+                  <div className="text-[11px] sm:text-xs leading-tight uppercase tracking-[.13em] text-[#75877b]">Total estimated cost</div>
+                  <div className="text-xl sm:text-2xl font-semibold mt-1 break-words">Ksh {totalCost.toFixed(2)}</div>
                 </div>
-                <div className="text-right">
-                  <div className="text-xs uppercase tracking-[.13em] text-[#75877b]">Days planned</div>
-                  <div className="text-lg sm:text-xl font-semibold mt-1 text-[#143f37]">
-                    {activeRoutes.length} of 7
+                <div className="shrink-0 text-right">
+                  <div className="text-[11px] sm:text-xs leading-tight uppercase tracking-[.13em] text-[#75877b]">Visits planned</div>
+                  <div className="text-xl font-semibold mt-1 text-[#143f37]">
+                    {activeRoutes.length}
                   </div>
                 </div>
               </div>
 
+              <div className="sticky bottom-3 z-10 -mx-1 mt-4 rounded-2xl bg-[#f6f7f4]/90 p-1.5 backdrop-blur sm:static sm:m-0 sm:mt-5 sm:bg-transparent sm:p-0">
               <Button
-                className="mt-5 w-full h-13 rounded-xl bg-[#a86743] hover:bg-[#8f5537] text-white shadow-lg shadow-[#a86743]/20 transition-all font-semibold"
+                className="w-full h-12 sm:h-13 rounded-xl bg-[#a86743] hover:bg-[#8f5537] text-white shadow-lg shadow-[#a86743]/20 transition-all font-semibold"
                 disabled={createPlan.isPending || activeRoutes.length === 0}
                 onClick={handleSubmit}
               >
-                {createPlan.isPending ? "Submitting…" : isAuthenticated ? `Submit plan (${activeRoutes.length} day${activeRoutes.length === 1 ? "" : "s"})` : "Sign in to submit"}
+                {createPlan.isPending ? "Submitting…" : isAuthenticated ? `Submit plan (${activeRoutes.length} visit${activeRoutes.length === 1 ? "" : "s"})` : "Sign in to submit"}
                 <ArrowRight className="ml-2" size={18} />
               </Button>
+              </div>
 
             </CardContent>
           </Card>
@@ -345,37 +349,38 @@ export default function Home() {
 
 function Stat({ label, value }: { label: string; value: string }) { 
   return (
-    <div className="rounded-2xl bg-white border border-[#e5ebe3] p-2.5 sm:p-4 min-w-0">
-      <div className="text-base sm:text-xl font-semibold tracking-tight truncate" title={value}>{value}</div>
-      <div className="text-[10px] sm:text-xs text-[#7b8a81] mt-1 truncate">{label}</div>
+    <div className="min-w-0 rounded-2xl bg-white border border-[#e5ebe3] p-3 sm:p-4">
+      <div className="text-base sm:text-xl font-semibold tracking-tight break-words">{value}</div>
+      <div className="text-[11px] sm:text-xs leading-tight text-[#7b8a81] mt-1">{label}</div>
     </div> 
   )
 }
 
-function DayCard({ day, index, route, error, canRemove, onRemove, onChange }: {
+function DayCard({ day, index, routes, error, canRemove, onRemove, onRemoveVisit, onChange }: {
   day: string
   index: number
-  route: RouteDraft
+  routes: RouteDraft[]
   error?: string
   canRemove: boolean
   onRemove: () => void
-  onChange: (field: keyof RouteDraft, value: string) => void
+  onRemoveVisit: (routeIndex: number) => void
+  onChange: (routeIndex: number, field: keyof RouteDraft, value: string) => void
 }) { 
-  const active = route.from.trim() || route.to.trim() 
+  const active = routes.some(route => route.from.trim() || route.to.trim())
   return (
-    <div className={`rounded-2xl border ${active ? "border-[#c8d8c5] bg-[#fbfcf8]" : "border-[#edf0eb] bg-white"} p-4 transition-colors`}>
+    <div className={`rounded-2xl border ${active ? "border-[#c8d8c5] bg-[#fbfcf8]" : "border-[#edf0eb] bg-white"} p-3.5 sm:p-4 transition-colors`}>
       <div className="flex items-center gap-3 mb-4">
         <div className={`size-8 rounded-xl grid place-items-center text-xs font-semibold ${active ? "bg-[#dce9d5] text-[#3e654d]" : "bg-[#f1f3ef] text-[#8a978e]"}`}>
           {String(index + 1).padStart(2, "0")}
         </div>
-        <div className="font-semibold text-sm">{day}</div>
-        {active && <Check size={16} className="text-[#5b8a62]" />}
+        <div className="min-w-0 font-semibold text-sm">{day}</div>
+        {active && <Check size={16} className="shrink-0 text-[#5b8a62]" />}
 
         {canRemove && (
           <button
             type="button"
             onClick={onRemove}
-            className="ml-auto text-xs text-[#95a49a] hover:text-[#b85f46] flex items-center gap-1 transition-colors"
+            className="ml-auto shrink-0 text-xs text-[#95a49a] hover:text-[#b85f46] flex items-center gap-1 transition-colors"
             title={`Remove ${day}`}
           >
             <Trash2 size={14} />
@@ -386,31 +391,33 @@ function DayCard({ day, index, route, error, canRemove, onRemove, onChange }: {
 
       {error && <p role="alert" className="mb-3 rounded-lg bg-[#fff1eb] px-3 py-2 text-xs text-[#a34f38]">{error}</p>}
 
-      <div className="grid sm:grid-cols-2 gap-3">
-        <Field label="From" value={route.from} placeholder="e.g. CBD Nairobi"  onChange={v => onChange("from", v)} />
-        <Field label="To" value={route.to} placeholder="e.g. Westlands Supermarket" onChange={v => onChange("to", v)} />
-        <Field label="Planned arrival" type="time" value={route.plannedArrival} onChange={v => onChange("plannedArrival", v)} />
-        <Field label="Departure" type="time" value={route.departure} onChange={v => onChange("departure", v)} />
-          
-        <div>
-          <Label className="text-xs text-[#77877d]">Transport mode</Label>
-          <Select value={route.transportMode} onValueChange={v => onChange("transportMode", v)}>
-            <SelectTrigger className="mt-1 h-11 rounded-xl border-[#dfe7df]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {MODES.map(mode => <SelectItem key={mode} value={mode}>{mode}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <Field
-          label="Cost incurred (Ksh)"
-          inputMode="decimal"
-          value={route.cost}
-          placeholder="0.00"
-          onChange={v => onChange("cost", v)}
-        />
+      <div className="space-y-4">
+        {routes.map((route, routeIndex) => (
+          <div key={routeIndex} className="rounded-xl border border-[#edf0eb] bg-white p-3">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-[11px] font-semibold uppercase tracking-[.12em] text-[#8a978e]">Visit {routeIndex + 1}</span>
+              {routes.length > 1 && <button type="button" onClick={() => onRemoveVisit(routeIndex)} className="text-xs text-[#95a49a] hover:text-[#b85f46]">Remove visit</button>}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2 sm:col-span-1"><Field label="From" value={route.from} placeholder="e.g. CBD Nairobi" onChange={v => onChange(routeIndex, "from", v)} /></div>
+              <div className="col-span-2 sm:col-span-1"><Field label="To" value={route.to} placeholder="e.g. Westlands Supermarket" onChange={v => onChange(routeIndex, "to", v)} /></div>
+              <Field label="Planned arrival" type="time" value={route.plannedArrival} onChange={v => onChange(routeIndex, "plannedArrival", v)} />
+              <Field label="Departure" type="time" value={route.departure} onChange={v => onChange(routeIndex, "departure", v)} />
+              <div className="min-w-0">
+                <Label className="text-xs text-[#77877d]">Transport mode</Label>
+                <Select value={route.transportMode} onValueChange={v => onChange(routeIndex, "transportMode", v)}>
+                  <SelectTrigger className="mt-1 h-11 w-full min-w-0 rounded-xl border-[#dfe7df] text-xs sm:text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>{MODES.map(mode => <SelectItem key={mode} value={mode}>{mode}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <Field label="Cost incurred (Ksh)" inputMode="decimal" value={route.cost} placeholder="0.00" onChange={v => onChange(routeIndex, "cost", v)} />
+            </div>
+          </div>
+        ))}
       </div>
+      {routes.length < 7 && <Button type="button" variant="outline" className="mt-3 h-10 w-full rounded-xl border-dashed text-[#143f37]" onClick={() => onChange(routes.length, "from", "")}>
+        <Plus size={16} /> Add another visit on {day}
+      </Button>}
     </div> 
   )
 }
@@ -452,20 +459,20 @@ function PlanRow({ plan, openPlan, setOpenPlan }: {
   return (
     <div className="p-5 sm:px-7">
       <button
-        className="w-full text-left flex items-start sm:items-center justify-between gap-3 sm:gap-4"
+        className="w-full text-left flex items-center justify-between gap-4"
         onClick={() => setOpenPlan(openPlan === plan.id ? null : plan.id)}
       >
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold truncate">Week commencing {plan.weekStart}</div>
-          <div className="text-xs sm:text-sm text-[#7b8a81] mt-1">
+        <div>
+          <div className="font-semibold">Week commencing {plan.weekStart}</div>
+          <div className="text-sm text-[#7b8a81] mt-1">
             {routes.length} route day{routes.length === 1 ? "" : "s"} · Ksh {Number(plan.totalCost).toFixed(2)} estimated
           </div>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <span className={`rounded-full px-2.5 sm:px-3 py-1 text-xs font-medium whitespace-nowrap ${plan.status === "reviewed" ? "bg-[#e4f0e2] text-[#4c7755]" : "bg-[#f6eadf] text-[#9a623e]"}`}>
+        <div className="flex items-center gap-3">
+          <span className={`rounded-full px-3 py-1 text-xs font-medium ${plan.status === "reviewed" ? "bg-[#e4f0e2] text-[#4c7755]" : "bg-[#f6eadf] text-[#9a623e]"}`}>
             {plan.status}
           </span>
-          <ChevronDown size={17} className={`text-[#8a978e] transition-transform shrink-0 ${openPlan === plan.id ? "rotate-180" : ""}`} />
+          <ChevronDown size={17} className={`text-[#8a978e] transition-transform ${openPlan === plan.id ? "rotate-180" : ""}`} />
         </div>
       </button>
       {openPlan === plan.id && (
