@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { useAuth } from "@/_core/hooks/useAuth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -18,13 +18,22 @@ export default function HR() {
     enabled: isAuthenticated && user?.role === "admin",
   })
 
+  type PlanWithRoutes = NonNullable<typeof plans.data>[number]
+  const pendingReviewPlanRef = useRef<PlanWithRoutes | null>(null)
+
   const markReviewed = trpc.routePlans.markReviewed.useMutation({
     onSuccess: () => {
       toast.success("Route plan marked as reviewed")
       utils.routePlans.all.invalidate()
+      if (pendingReviewPlanRef.current) {
+        downloadReviewedPlan(pendingReviewPlanRef.current)
+        toast.success("Review report downloaded")
+        pendingReviewPlanRef.current = null
+      }
     },
     onError: (err) => {
       toast.error(err.message || "Failed to update review status")
+      pendingReviewPlanRef.current = null
     },
   })
 
@@ -117,6 +126,99 @@ export default function HR() {
     link.click()
     document.body.removeChild(link)
     toast.success("CSV export downloaded successfully")
+  }
+
+  // Generate and auto-download an Excel-compatible report for a single reviewed plan
+  const downloadReviewedPlan = (plan: PlanWithRoutes) => {
+    const merchandiser = plan.merchandizerName || plan.merchandizerEmail || `Merchandiser #${plan.submittedBy}`
+    const reviewedOn = new Date().toLocaleString("en-KE", { dateStyle: "medium", timeStyle: "short" })
+    const routes = plan.dailyRoutes || []
+
+    const esc = (value: unknown) =>
+      String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+
+    const cell = "border:1px solid #d7dde3;padding:6px 10px;"
+    const routeRows = routes.length
+      ? routes
+          .map(
+            (r: any) => `
+          <tr>
+            <td style="${cell}">${esc(r.day)}</td>
+            <td style="${cell}">${esc(r.from)}</td>
+            <td style="${cell}">${esc(r.to)}</td>
+            <td style="${cell}">${esc(r.plannedArrival)}</td>
+            <td style="${cell}">${esc(r.departure)}</td>
+            <td style="${cell}">${esc(r.transportMode)}</td>
+            <td style="${cell}text-align:right;">${Number(r.cost).toFixed(2)}</td>
+          </tr>`
+          )
+          .join("")
+      : `<tr><td colspan="7" style="${cell}text-align:center;">No route days recorded</td></tr>`
+
+    const html = `
+      <html xmlns:x="urn:schemas-microsoft-com:office:excel">
+      <head>
+        <meta charset="utf-8" />
+        <!--[if gte mso 9]>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+                <x:Name>Route Plan</x:Name>
+                <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <style>
+          table { border-collapse: collapse; font-family: Calibri, Arial, sans-serif; font-size: 12px; }
+          th { background:#274765; color:#ffffff; padding:8px 10px; border:1px solid #d7dde3; text-align:left; }
+          .title { font-size:16px; font-weight:bold; color:#1b2b3d; }
+          .meta-label { color:#6c7887; font-size:11px; text-transform:uppercase; }
+          .meta-value { font-weight:bold; color:#1b2b3d; font-size:13px; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <tr><td colspan="7" class="title">Sassy Cosmetic &amp; Beauty Products &mdash; Route Plan Review</td></tr>
+          <tr><td colspan="7">&nbsp;</td></tr>
+          <tr>
+            <td class="meta-label">Merchandiser</td><td colspan="2" class="meta-value">${esc(merchandiser)}</td>
+            <td class="meta-label">Week Commencing</td><td colspan="3" class="meta-value">${esc(plan.weekStart)}</td>
+          </tr>
+          <tr>
+            <td class="meta-label">Status</td><td colspan="2" class="meta-value">Reviewed</td>
+            <td class="meta-label">Reviewed On</td><td colspan="3" class="meta-value">${esc(reviewedOn)}</td>
+          </tr>
+          <tr>
+            <td class="meta-label">Total Estimated Cost</td><td colspan="6" class="meta-value">Ksh ${Number(plan.totalCost).toFixed(2)}</td>
+          </tr>
+          <tr><td colspan="7">&nbsp;</td></tr>
+          <tr>
+            <th>Day</th><th>From</th><th>To</th><th>Planned Arrival</th><th>Departure</th><th>Transport Mode</th><th>Cost (Ksh)</th>
+          </tr>
+          ${routeRows}
+        </table>
+      </body>
+      </html>`
+
+    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    const safeMerchandiser = merchandiser.replace(/[^a-z0-9]+/gi, "_").toLowerCase()
+    link.href = url
+    link.download = `route_plan_${safeMerchandiser}_${plan.weekStart}.xls`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  const handleMarkReviewed = () => {
+    if (!selected) return
+    pendingReviewPlanRef.current = selected
+    markReviewed.mutate({ id: selected.id })
   }
 
   if (loading) {
@@ -426,7 +528,7 @@ export default function HR() {
 
                 {selected && selected.status !== "reviewed" && (
                   <Button
-                    onClick={() => markReviewed.mutate({ id: selected.id })}
+                    onClick={handleMarkReviewed}
                     disabled={markReviewed.isPending}
                     className="bg-[#274765] hover:bg-[#1f3850] rounded-xl shadow-md text-white font-medium"
                   >
