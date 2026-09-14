@@ -1,13 +1,17 @@
-const CONFIG = {
+export const ROUTE_PLAN_PDF_CONFIG = {
   // Company / branding
   companyName: "Sassy Cosmetic & Beauty Products",
   documentTitle: "Route Plan Review Report",
-  footerText: "Confidential – For internal HR use only",
+  footerText: "Confidential - For internal HR use only",
+  logo: {
+    src: "/sassy-logo.png",
+    width: 42,
+    height: 42,
+  },
 
   // Colors (RGB 0–255)
   primary: [39, 71, 101],   // deep blue
-  accent:  [209, 164, 91],  // gold
-  ...
+  accent: [209, 164, 91], // gold
 
   // Page
   pageSize: "a4",           // or "letter"
@@ -24,4 +28,6 @@ const CONFIG = {
     { key: "transportMode",  header: "Transport" },
     { key: "cost",           header: "Cost (Ksh)" },
   ],
-}
+} as const;
+
+export type RoutePlanPdfConfig = typeof ROUTE_PLAN_PDF_CONFIG;
