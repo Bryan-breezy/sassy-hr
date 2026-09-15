@@ -48,7 +48,7 @@ export default function Home() {
   const [weekStart, setWeekStart] = useState(mondayDate)
   const [routes, setRoutes] = useState<Record<string, RouteDraft[]>>(blankRoutes)
   // Keep track of which days the merchandiser has activated to fill in (starts with Monday active)
-  const [activeDays, setActiveDays] = useState<Set<string>>(() => new Set(["Monday"]))
+  const [activeDays, setActiveDays] = useState<Set<string>>(() => new Set([""]))
   const [openPlan, setOpenPlan] = useState<number | null>(null)
   const [dayErrors, setDayErrors] = useState<Record<string, string>>({})
   const utils = trpc.useUtils()
@@ -158,7 +158,7 @@ export default function Home() {
           <div className="flex items-center gap-3">
             <div>
               <div className="font-semibold tracking-tight text-base sm:text-lg max-w-[220px] sm:max-w-none truncate">Sassy Cosmetic &amp; Beauty Products (K) Limited</div>
-              <div className="text-[11px] sm:text-xs text-[#6d8075]">Merchandiser route planning</div>
+              <div className="text-[11px] sm:text-xs text-[#6d8075]">Merchandisers weekly Route Plan</div>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -185,12 +185,9 @@ export default function Home() {
       <main className="max-w-7xl mx-auto px-4 sm:px-8 py-6 sm:py-12">
         <div className="grid lg:grid-cols-[1.05fr_.95fr] gap-6 lg:gap-8 items-start">
           <section className="order-2 lg:order-1">
-            <p className="text-xs uppercase tracking-[.18em] text-[#8b5e3c] font-semibold">Weekly field plan</p>
             <h1 className="mt-3 text-4xl sm:text-6xl leading-[.98] font-semibold tracking-[-.05em] max-w-xl">
-              Make every visit count.
+              Weekly Route Schedule.
             </h1>
-            <p className="mt-4 max-w-md text-sm sm:text-base leading-6 text-[#718278]">Plan the places you will visit this week, then send your route directly to HR.</p>
-
             <div className="mt-7 sm:mt-10 grid grid-cols-3 gap-2 sm:gap-3 max-w-xl">
               <Stat label="Planned visits" value={activeRoutes.length.toString().padStart(2, "0")} />
               <Stat label="Planned cost" value={`Ksh ${totalCost.toFixed(2)}`} />
