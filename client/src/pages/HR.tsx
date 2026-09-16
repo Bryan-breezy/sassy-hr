@@ -6,6 +6,7 @@ import {  ArrowLeft, CheckCircle2, Clock3, Download, FileSpreadsheet, LayoutDash
 import { trpc } from "@/lib/trpc"
 import { Link } from "wouter"
 import { toast } from "sonner"
+import LoadingScreen from "@/components/LoadingScreen"
 
 export default function HR() {
   const { user, loading, isAuthenticated, logout } = useAuth()
@@ -221,13 +222,7 @@ export default function HR() {
     markReviewed.mutate({ id: selected.id })
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#f4f6f9] grid place-items-center text-[#223047]">
-        Loading HR console…
-      </div>
-    )
-  }
+ if (loading || !isAuthenticated) return <LoadingScreen />
 
   if (!isAuthenticated || user?.role !== "admin") {
     return (
@@ -255,13 +250,7 @@ export default function HR() {
     )
   }
 
-  if (plans.isLoading) {
-    return (
-      <div className="min-h-screen bg-[#f4f6f9] grid place-items-center text-[#223047]">
-        Loading route submissions from Google Sheets…
-      </div>
-    )
-  }
+  if (plans.isLoading) { return <LoadingScreen /> }
 
   if (plans.isError) {
     return (
