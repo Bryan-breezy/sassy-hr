@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner"
 import { ArrowRight, CalendarDays, Check, ChevronDown, LogOut, Plus, Trash2 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
+import LoadingScreen from "@/components/LoadingScreen"
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 const MODES = ["Walking", "Public transport", "Motorcycle", "Car", "Taxi", "Other"] as const
@@ -160,8 +161,9 @@ export default function Home() {
     });
   };
 
-  if (loading || !isAuthenticated) return <div className="min-h-screen bg-[#f6f7f4] flex items-center justify-center text-[#193b35]">Redirecting to sign in…</div>
-
+  if (loading || !isAuthenticated) return <LoadingScreen />
+  if (mine.isLoading) return <LoadingScreen />
+  
   return (
     <div className="min-h-screen bg-[#f6f7f4] text-[#18352f]">
       <header className="border-b border-[#dfe7df] bg-[#f6f7f4]/90 backdrop-blur sticky top-0 z-20">
