@@ -124,9 +124,20 @@ export default function Home() {
 
     setDayErrors(errors);
 
-    if (Object.keys(errors).length) { 
-      toast.error("Please fix the highlighted route details");
-      return;
+    if (Object.keys(errors).length) {
+      const firstError = Object.keys(errors)[0]
+      if (firstError === "Week") {
+        const weekInput = document.getElementById("week-start")
+        weekInput?.focus()
+        weekInput?.scrollIntoView({ behavior: "smooth", block: "center" })
+      } else {
+        const firstDayCard = document.getElementById(`route-day-${firstError}`)
+        firstDayCard?.focus()
+        firstDayCard?.scrollIntoView({ behavior: "smooth", block: "center" })
+      }
+
+      toast.error("Please fix the highlighted route details")
+      return
     }
 
     if (!activeRoutes.length) {
@@ -274,6 +285,7 @@ export default function Home() {
                       key={day}
                       day={day}
                       index={index}
+                      cardId={`route-day-${day}`}
                       routes={routes[day]}
                       error={dayErrors[day]}
                       onRemove={() => toggleDay(day)}
