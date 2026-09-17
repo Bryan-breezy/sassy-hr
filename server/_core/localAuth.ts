@@ -50,6 +50,61 @@ function verifyPassword(password: string, storedHash: string) {
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
+// ─── Basic in-memory login rate limiting ──────────────────────────────────
+// Per-warm-instance protection against password guessing on /api/auth/login.
+// In a serverless environment this resets on cold start and isn't shared
+// across instances, so it's not an absolute guarantee — but it stops the
+// common case (a script hammering the endpoint over one connection) at
+// negligible cost. For a stronger guarantee, back this with a shared store
+// (e.g. Redis) instead.
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+type LoginAttempt = { count: number; windowStart: number };
+const loginAttempts = new Map<string, LoginAttempt>();
+
+function getClientIp(req: Request): string {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.length) return forwarded.split(",")[0].trim();
+  return req.socket.remoteAddress ?? "unknown";
+}
+
+function loginRateLimitKey(req: Request, username: string) {
+  return `${getClientIp(req)}:${username.trim().toLowerCase()}`;
+}
+
+/** Returns seconds remaining if currently rate-limited, otherwise null. */
+function checkRateLimit(key: string): number | null {
+  const attempt = loginAttempts.get(key);
+  if (!attempt) return null;
+
+  const elapsed = Date.now() - attempt.windowStart;
+  if (elapsed > LOGIN_WINDOW_MS) {
+    loginAttempts.delete(key);
+    return null;
+  }
+
+  if (attempt.count >= LOGIN_MAX_ATTEMPTS) {
+    return Math.ceil((LOGIN_WINDOW_MS - elapsed) / 1000);
+  }
+
+  return null;
+}
+
+function recordFailedLoginAttempt(key: string) {
+  const now = Date.now();
+  const existing = loginAttempts.get(key);
+  if (!existing || now - existing.windowStart > LOGIN_WINDOW_MS) {
+    loginAttempts.set(key, { count: 1, windowStart: now });
+  } else {
+    existing.count += 1;
+  }
+}
+
+function clearLoginAttempts(key: string) {
+  loginAttempts.delete(key);
+}
+
 async function createSession(res: Response, req: Request, openId: string, name: string, role: "user" | "admin") {
   const sessionToken = await sdk.createSessionToken(openId, { name, expiresInMs: ONE_YEAR_MS });
   const cookieOptions = getSessionCookieOptions(req);
@@ -71,6 +126,17 @@ export function registerLocalAuthRoutes(app: Express) {
       return;
     }
 
+    const rateLimitKey = loginRateLimitKey(req, username);
+    const retryAfterSeconds = checkRateLimit(rateLimitKey);
+    if (retryAfterSeconds !== null) {
+      const minutes = Math.ceil(retryAfterSeconds / 60);
+      res.setHeader("Retry-After", String(retryAfterSeconds));
+      res.status(429).json({
+        error: `Too many failed sign-in attempts. Please try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`,
+      });
+      return;
+    }
+
     const localUsers = getLocalUsers();
 
     const match = localUsers.find(
@@ -79,10 +145,13 @@ export function registerLocalAuthRoutes(app: Express) {
 
     const storedUser = match ? null : await db.getUserByUsername(username.trim());
     if (!match && (!storedUser?.passwordHash || !verifyPassword(password, storedUser.passwordHash))) {
+      recordFailedLoginAttempt(rateLimitKey);
       // Avoid leaking whether the username or password was wrong.
       res.status(401).json({ error: "Invalid username or password." });
       return;
     }
+
+    clearLoginAttempts(rateLimitKey);
 
     const openId = match ? `local:${match.username}` : storedUser!.openId;
     const displayName = match?.displayName ?? storedUser!.name ?? storedUser!.username ?? username.trim();

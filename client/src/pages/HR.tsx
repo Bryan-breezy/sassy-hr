@@ -2,6 +2,16 @@ import { useMemo, useRef, useState } from "react"
 import { useAuth } from "@/_core/hooks/useAuth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {  ArrowLeft, CheckCircle2, Clock3, Download, FileSpreadsheet, LayoutDashboard, LogOut, MapPin, RefreshCw, Search, ShieldCheck, UsersRound } from "lucide-react"
 import { trpc } from "@/lib/trpc"
 import { Link } from "wouter"
@@ -216,10 +226,13 @@ export default function HR() {
     URL.revokeObjectURL(url)
   }
 
+  const [confirmReviewOpen, setConfirmReviewOpen] = useState(false)
+
   const handleMarkReviewed = () => {
     if (!selected) return
     pendingReviewPlanRef.current = selected
     markReviewed.mutate({ id: selected.id })
+    setConfirmReviewOpen(false)
   }
 
   if (loading) return <LoadingScreen />
@@ -517,7 +530,7 @@ export default function HR() {
 
                 {selected && selected.status !== "reviewed" && (
                   <Button
-                    onClick={handleMarkReviewed}
+                    onClick={() => setConfirmReviewOpen(true)}
                     disabled={markReviewed.isPending}
                     className="bg-[#274765] hover:bg-[#1f3850] rounded-xl shadow-md text-white font-medium"
                   >
@@ -525,6 +538,30 @@ export default function HR() {
                     {markReviewed.isPending ? "Updating…" : "Mark Reviewed"}
                   </Button>
                 )}
+
+                <AlertDialog open={confirmReviewOpen} onOpenChange={setConfirmReviewOpen}>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Mark this route plan as reviewed?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {selected && (
+                          <>
+                            This updates the status for{" "}
+                            <span className="font-medium text-[#1e2f41]">
+                              {selected.merchandizerName || selected.merchandizerEmail || `Merchandiser #${selected.submittedBy}`}
+                            </span>
+                            's week commencing {selected.weekStart} in Google Sheets, and immediately downloads a
+                            review report. This can't be undone from here.
+                          </>
+                        )}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleMarkReviewed}>Yes, mark reviewed</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
 
                 {selected && selected.status === "reviewed" && (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#e2f0e6] text-[#4e7b5e] text-xs font-bold">
