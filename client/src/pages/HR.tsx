@@ -222,7 +222,7 @@ export default function HR() {
     markReviewed.mutate({ id: selected.id })
   }
 
- if (loading || !isAuthenticated) return <LoadingScreen />
+  if (loading) return <LoadingScreen />
 
   if (!isAuthenticated || user?.role !== "admin") {
     return (

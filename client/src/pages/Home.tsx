@@ -49,7 +49,7 @@ export default function Home() {
   const [weekStart, setWeekStart] = useState(mondayDate)
   const [routes, setRoutes] = useState<Record<string, RouteDraft[]>>(blankRoutes)
   // Keep track of which days the merchandiser has activated to fill in (starts with Monday active)
-  const [activeDays, setActiveDays] = useState<Set<string>>(() => new Set([""]))
+  const [activeDays, setActiveDays] = useState<Set<string>>(() => new Set(["Monday"]))
   const [openPlan, setOpenPlan] = useState<number | null>(null)
   const [dayErrors, setDayErrors] = useState<Record<string, string>>({})
   const utils = trpc.useUtils()
@@ -127,14 +127,16 @@ export default function Home() {
 
     if (Object.keys(errors).length) {
       const firstError = Object.keys(errors)[0]
-      if (firstError === "Week") {
-        const weekInput = document.getElementById("week-start")
-        weekInput?.focus()
-        weekInput?.scrollIntoView({ behavior: "smooth", block: "center" })
-      } else {
-        const firstDayCard = document.getElementById(`route-day-${firstError}`)
-        firstDayCard?.focus()
-        firstDayCard?.scrollIntoView({ behavior: "smooth", block: "center" })
+      const target = firstError === "Week"
+        ? document.getElementById("week-start")
+        : document.getElementById(`route-day-${firstError}`)
+
+      if (target) {
+        const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        target.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "center" })
+        target.focus({ preventScroll: true })
+        target.classList.add("ring-2", "ring-[#b85f46]", "ring-offset-2")
+        window.setTimeout(() => target.classList.remove("ring-2", "ring-[#b85f46]", "ring-offset-2"), 2000)
       }
 
       toast.error("Please fix the highlighted route details")
@@ -143,6 +145,7 @@ export default function Home() {
 
     if (!activeRoutes.length) {
       toast.error("Add route details for at least one day before submitting");
+      document.getElementById("week-start")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
 
@@ -367,9 +370,10 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
-function DayCard({ day, index, routes, error, canRemove, onRemove, onRemoveVisit, onChange }: {
+function DayCard({ day, index, cardId, routes, error, canRemove, onRemove, onRemoveVisit, onChange }: {
   day: string
   index: number
+  cardId?: string
   routes: RouteDraft[]
   error?: string
   canRemove: boolean
@@ -379,7 +383,7 @@ function DayCard({ day, index, routes, error, canRemove, onRemove, onRemoveVisit
 }) { 
   const active = routes.some(route => route.from.trim() || route.to.trim())
   return (
-    <div className={`rounded-2xl border ${active ? "border-[#c8d8c5] bg-[#fbfcf8]" : "border-[#edf0eb] bg-white"} p-3.5 sm:p-4 transition-colors`}>
+    <div id={cardId} tabIndex={-1} className={`scroll-mt-24 rounded-2xl border ${active ? "border-[#c8d8c5] bg-[#fbfcf8]" : "border-[#edf0eb] bg-white"} ${error ? "border-[#b85f46]" : ""} p-3.5 sm:p-4 transition-all`}>
       <div className="flex items-center gap-3 mb-4">
         <div className={`size-8 rounded-xl grid place-items-center text-xs font-semibold ${active ? "bg-[#dce9d5] text-[#3e654d]" : "bg-[#f1f3ef] text-[#8a978e]"}`}>
           {String(index + 1).padStart(2, "0")}
