@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useAuth } from "@/_core/hooks/useAuth"
 import { navigateToLogin } from "@/const"
 import { Button } from "@/components/ui/button"
@@ -36,6 +36,80 @@ const blankRoutes = (): Record<string, RouteDraft[]> => Object.fromEntries(
   DAYS.map(day => [day, [blankRoute()]])
 )
 
+// ─── Draft autosave ──────────────────────────────────────────────────────
+// Keeps an in-progress route plan in localStorage so a merchandiser doesn't
+// lose their work to an accidental refresh, tab close, or lost connection.
+const DRAFT_STORAGE_KEY = "sassy-hr:draft:v1"
+
+type Draft = {
+  weekStart: string
+  routes: Record<string, RouteDraft[]>
+  activeDays: string[]
+}
+
+function isValidRouteDraft(value: any): value is RouteDraft {
+  return Boolean(value) &&
+    typeof value.from === "string" &&
+    typeof value.to === "string" &&
+    typeof value.plannedArrival === "string" &&
+    typeof value.departure === "string" &&
+    typeof value.cost === "string" &&
+    typeof value.transportMode === "string"
+}
+
+function hasDraftContent(routes: Record<string, RouteDraft[]>) {
+  return Object.values(routes).some(dayRoutes => dayRoutes.some(route => route.from.trim() || route.to.trim()))
+}
+
+function loadDraft(): Draft | null {
+  try {
+    const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+
+    if (
+      typeof parsed?.weekStart !== "string" ||
+      !Array.isArray(parsed?.activeDays) ||
+      typeof parsed?.routes !== "object" || parsed.routes === null
+    ) return null
+
+    const activeDays = parsed.activeDays.filter((day: unknown): day is string => typeof day === "string" && DAYS.includes(day))
+    if (!activeDays.length) return null
+
+    const routes: Record<string, RouteDraft[]> = {}
+    for (const day of DAYS) {
+      const dayRoutes = parsed.routes[day]
+      routes[day] = Array.isArray(dayRoutes) && dayRoutes.length && dayRoutes.every(isValidRouteDraft)
+        ? dayRoutes
+        : [blankRoute()]
+    }
+
+    if (!hasDraftContent(routes)) return null
+
+    return { weekStart: parsed.weekStart, routes, activeDays }
+  } catch {
+    // Corrupted or unreadable draft — treat as if there wasn't one
+    return null
+  }
+}
+
+function saveDraft(draft: Draft) {
+  try {
+    window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft))
+  } catch {
+    // Storage full or unavailable (e.g. private browsing) — autosave is a
+    // convenience, not a requirement, so fail silently.
+  }
+}
+
+function clearDraft() {
+  try {
+    window.localStorage.removeItem(DRAFT_STORAGE_KEY)
+  } catch {
+    // ignore
+  }
+}
+
 function mondayDate() {
   const date = new Date()
   const day = date.getDay()
@@ -46,13 +120,30 @@ function mondayDate() {
 
 export default function Home() {
   const { user, loading, isAuthenticated, logout } = useAuth({ redirectOnUnauthenticated: true })
-  const [weekStart, setWeekStart] = useState(mondayDate)
-  const [routes, setRoutes] = useState<Record<string, RouteDraft[]>>(blankRoutes)
+  const [initialDraft] = useState(loadDraft)
+  const [weekStart, setWeekStart] = useState(initialDraft?.weekStart ?? mondayDate)
+  const [routes, setRoutes] = useState<Record<string, RouteDraft[]>>(initialDraft?.routes ?? blankRoutes())
   // Keep track of which days the merchandiser has activated to fill in (starts with Monday active)
-  const [activeDays, setActiveDays] = useState<Set<string>>(() => new Set(["Monday"]))
+  const [activeDays, setActiveDays] = useState<Set<string>>(() => new Set(initialDraft?.activeDays ?? ["Monday"]))
   const [openPlan, setOpenPlan] = useState<number | null>(null)
   const [dayErrors, setDayErrors] = useState<Record<string, string>>({})
   const utils = trpc.useUtils()
+
+  // Let the merchandiser know we picked up where they left off
+  useEffect(() => {
+    if (initialDraft) toast.info("Restored your unsaved route plan draft")
+    // Only ever run once, on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Autosave the in-progress plan to localStorage as it changes
+  useEffect(() => {
+    if (hasDraftContent(routes)) {
+      saveDraft({ weekStart, routes, activeDays: Array.from(activeDays) })
+    } else {
+      clearDraft()
+    }
+  }, [weekStart, routes, activeDays])
 
   const createPlan = trpc.routePlans.create.useMutation({
     onSuccess: () => { 
@@ -60,6 +151,7 @@ export default function Home() {
       setRoutes(blankRoutes()) 
       setActiveDays(new Set(["Monday"]));
       setDayErrors({}); 
+      clearDraft();
       utils.routePlans.mine.invalidate(); 
     },
     onError: (error) => toast.error(error.message || "Please review the route details and try again"),
