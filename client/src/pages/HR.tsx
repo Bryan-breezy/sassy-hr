@@ -12,11 +12,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import {  ArrowLeft, CheckCircle2, Clock3, Download, FileSpreadsheet, LayoutDashboard, LogOut, MapPin, RefreshCw, Search, ShieldCheck, UsersRound } from "lucide-react"
+import {  ArrowLeft, CheckCircle2, Clock3, Download, FileSpreadsheet, FileText, LayoutDashboard, LogOut, MapPin, RefreshCw, Search, ShieldCheck, UsersRound } from "lucide-react"
 import { trpc } from "@/lib/trpc"
 import { Link } from "wouter"
 import { toast } from "sonner"
 import LoadingScreen from "@/components/LoadingScreen"
+import { downloadRoutePlanPdf } from "@/lib/routePlanPdf"
 
 export default function HR() {
   const { user, loading, isAuthenticated, logout } = useAuth()
@@ -36,10 +37,12 @@ export default function HR() {
     onSuccess: () => {
       toast.success("Route plan marked as reviewed")
       utils.routePlans.all.invalidate()
-      if (pendingReviewPlanRef.current) {
-        downloadReviewedPlan(pendingReviewPlanRef.current)
-        toast.success("Review report downloaded")
-        pendingReviewPlanRef.current = null
+      const reviewedPlan = pendingReviewPlanRef.current
+      pendingReviewPlanRef.current = null
+      if (reviewedPlan) {
+        void downloadReviewedPlan(reviewedPlan, new Date()).then((ok) => {
+          if (ok) toast.success("Review report (PDF) downloaded")
+        })
       }
     },
     onError: (err) => {
@@ -139,91 +142,16 @@ export default function HR() {
     toast.success("CSV export downloaded successfully")
   }
 
-  // Generate and auto-download an Excel-compatible report for a single reviewed plan
-  const downloadReviewedPlan = (plan: PlanWithRoutes) => {
-    const merchandiser = plan.merchandizerName || plan.merchandizerEmail || `Merchandiser #${plan.submittedBy}`
-    const reviewedOn = new Date().toLocaleString("en-KE", { dateStyle: "medium", timeStyle: "short" })
-    const routes = plan.dailyRoutes || []
-
-    const esc = (value: unknown) =>
-      String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-
-    const cell = "border:1px solid #d7dde3;padding:6px 10px;"
-    const routeRows = routes.length
-      ? routes
-          .map(
-            (r: any) => `
-          <tr>
-            <td style="${cell}">${esc(r.day)}</td>
-            <td style="${cell}">${esc(r.from)}</td>
-            <td style="${cell}">${esc(r.to)}</td>
-            <td style="${cell}">${esc(r.plannedArrival)}</td>
-            <td style="${cell}">${esc(r.departure)}</td>
-            <td style="${cell}">${esc(r.transportMode)}</td>
-            <td style="${cell}text-align:right;">${Number(r.cost).toFixed(2)}</td>
-          </tr>`
-          )
-          .join("")
-      : `<tr><td colspan="7" style="${cell}text-align:center;">No route days recorded</td></tr>`
-
-    const html = `
-      <html xmlns:x="urn:schemas-microsoft-com:office:excel">
-      <head>
-        <meta charset="utf-8" />
-        <!--[if gte mso 9]>
-        <xml>
-          <x:ExcelWorkbook>
-            <x:ExcelWorksheets>
-              <x:ExcelWorksheet>
-                <x:Name>Route Plan</x:Name>
-                <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
-              </x:ExcelWorksheet>
-            </x:ExcelWorksheets>
-          </x:ExcelWorkbook>
-        </xml>
-        <![endif]-->
-        <style>
-          table { border-collapse: collapse; font-family: Calibri, Arial, sans-serif; font-size: 12px; }
-          th { background:#274765; color:#ffffff; padding:8px 10px; border:1px solid #d7dde3; text-align:left; }
-          .title { font-size:16px; font-weight:bold; color:#1b2b3d; }
-          .meta-label { color:#6c7887; font-size:11px; text-transform:uppercase; }
-          .meta-value { font-weight:bold; color:#1b2b3d; font-size:13px; }
-        </style>
-      </head>
-      <body>
-        <table>
-          <tr><td colspan="7" class="title">Sassy Cosmetic &amp; Beauty Products &mdash; Route Plan Review</td></tr>
-          <tr><td colspan="7">&nbsp;</td></tr>
-          <tr>
-            <td class="meta-label">Merchandiser</td><td colspan="2" class="meta-value">${esc(merchandiser)}</td>
-            <td class="meta-label">Week Commencing</td><td colspan="3" class="meta-value">${esc(plan.weekStart)}</td>
-          </tr>
-          <tr>
-            <td class="meta-label">Status</td><td colspan="2" class="meta-value">Reviewed</td>
-            <td class="meta-label">Reviewed On</td><td colspan="3" class="meta-value">${esc(reviewedOn)}</td>
-          </tr>
-          <tr>
-            <td class="meta-label">Total Estimated Cost</td><td colspan="6" class="meta-value">Ksh ${Number(plan.totalCost).toFixed(2)}</td>
-          </tr>
-          <tr><td colspan="7">&nbsp;</td></tr>
-          <tr>
-            <th>Day</th><th>From</th><th>To</th><th>Planned Arrival</th><th>Departure</th><th>Transport Mode</th><th>Cost (Ksh)</th>
-          </tr>
-          ${routeRows}
-        </table>
-      </body>
-      </html>`
-
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel" })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    const safeMerchandiser = merchandiser.replace(/[^a-z0-9]+/gi, "_").toLowerCase()
-    link.href = url
-    link.download = `route_plan_${safeMerchandiser}_${plan.weekStart}.xls`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+  // Generate and auto-download a branded PDF (company logo + merchandiser details) for a plan
+  const downloadReviewedPlan = async (plan: PlanWithRoutes, reviewedOn?: Date | string) => {
+    try {
+      await downloadRoutePlanPdf(plan, { reviewedOn })
+      return true
+    } catch (err) {
+      console.error("Failed to generate route plan PDF", err)
+      toast.error("The PDF report could not be generated")
+      return false
+    }
   }
 
   const [confirmReviewOpen, setConfirmReviewOpen] = useState(false)
@@ -551,7 +479,7 @@ export default function HR() {
                               {selected.merchandizerName || selected.merchandizerEmail || `Merchandiser #${selected.submittedBy}`}
                             </span>
                             's week commencing {selected.weekStart} in Google Sheets, and immediately downloads a
-                            review report. This can't be undone from here.
+                            PDF review report with the merchandiser's details. This can't be undone from here.
                           </>
                         )}
                       </AlertDialogDescription>
@@ -564,9 +492,20 @@ export default function HR() {
                 </AlertDialog>
 
                 {selected && selected.status === "reviewed" && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#e2f0e6] text-[#4e7b5e] text-xs font-bold">
-                    <CheckCircle2 size={15} /> Reviewed
-                  </span>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#e2f0e6] text-[#4e7b5e] text-xs font-bold">
+                      <CheckCircle2 size={15} /> Reviewed
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => downloadReviewedPlan(selected, selected.updatedAt)}
+                      className="rounded-xl border-[#d7e0e8] text-[#42566b] hover:bg-[#f3f6f9]"
+                    >
+                      <FileText size={14} className="mr-1.5" />
+                      Download PDF
+                    </Button>
+                  </div>
                 )}
               </div>
 
