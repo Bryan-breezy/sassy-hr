@@ -575,6 +575,11 @@ function PlanRow({ plan, openPlan, setOpenPlan }: {
 }) { 
   const routes = plan.dailyRoutes || []
 
+  // Plans submitted before the lunch allowance existed only have transport in their total, so
+  // only show the breakdown when the saved total actually includes lunch money.
+  const costs = computePlanCosts(routes)
+  const lunchIncluded = routes.length > 0 && Math.abs(Number(plan.totalCost) - costs.totalCost) < 0.01
+
   return (
     <div className="p-5 sm:px-7">
       <button
@@ -605,6 +610,15 @@ function PlanRow({ plan, openPlan, setOpenPlan }: {
               </div>
             </div>
           ))}
+          {lunchIncluded && (
+            <div className="sm:col-span-2 rounded-xl bg-[#f3f6ef] p-3 text-sm flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[#5b7266]">
+                Transport Ksh {costs.transportCost.toFixed(2)} + Lunch allowance Ksh {costs.lunchCost.toFixed(2)}
+                {` (${costs.daysWithData} day${costs.daysWithData === 1 ? "" : "s"} × ${LUNCH_ALLOWANCE_PER_DAY})`}
+              </span>
+              <span className="font-semibold text-[#143f37]">Total Ksh {Number(plan.totalCost).toFixed(2)}</span>
+            </div>
+          )}
         </div>
       )}
     </div>
