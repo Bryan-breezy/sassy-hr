@@ -10,6 +10,7 @@ import { toast } from "sonner"
 import { ArrowRight, CalendarDays, Check, ChevronDown, LogOut, Plus, Trash2 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
 import LoadingScreen from "@/components/LoadingScreen"
+import { LUNCH_ALLOWANCE_PER_DAY, computePlanCosts } from "@shared/planCost"
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 const MODES = ["Walking", "Public transport", "Motorcycle", "Car", "Taxi", "Other"] as const
@@ -166,7 +167,8 @@ export default function Home() {
       .filter(route => route.from.trim() || route.to.trim())
   }, [routes, activeDays])
 
-  const totalCost = activeRoutes.reduce((sum, route) => sum + (Number(route.cost) || 0), 0)
+  // activeRoutes only holds visits with data, so lunch money is added only for days that have some
+  const { transportCost, daysWithData, lunchCost, totalCost } = useMemo(() => computePlanCosts(activeRoutes), [activeRoutes])
 
   const toggleDay = (day: string) => {
     setActiveDays(current => {
@@ -408,6 +410,10 @@ export default function Home() {
                 <div className="min-w-0">
                   <div className="text-[11px] sm:text-xs leading-tight uppercase tracking-[.13em] text-[#75877b]">Total estimated cost</div>
                   <div className="text-xl sm:text-2xl font-semibold mt-1 break-words">Ksh {totalCost.toFixed(2)}</div>
+                  <div className="mt-1 text-[11px] sm:text-xs text-[#75877b]">
+                    Transport Ksh {transportCost.toFixed(2)} + Lunch Ksh {lunchCost.toFixed(2)}
+                    {daysWithData > 0 && ` (${daysWithData} day${daysWithData === 1 ? "" : "s"} × ${LUNCH_ALLOWANCE_PER_DAY})`}
+                  </div>
                 </div>
                 <div className="shrink-0 text-right">
                   <div className="text-[11px] sm:text-xs leading-tight uppercase tracking-[.13em] text-[#75877b]">Visits planned</div>
@@ -525,6 +531,12 @@ function DayCard({ day, index, cardId, routes, error, canRemove, onRemove, onRem
       {routes.length < 7 && <Button type="button" variant="outline" className="mt-3 h-10 w-full rounded-xl border-dashed text-[#143f37]" onClick={() => onChange(routes.length, "from", "")}>
         <Plus size={16} /> Add another visit on {day}
       </Button>}
+      {active && (
+        <div className="mt-3 flex items-center justify-between rounded-xl bg-[#f3f6ef] px-3 py-2 text-xs text-[#5b7266]">
+          <span>Lunch allowance (once per day)</span>
+          <span className="font-semibold text-[#143f37]">+ Ksh {LUNCH_ALLOWANCE_PER_DAY.toFixed(2)}</span>
+        </div>
+      )}
     </div> 
   )
 }
