@@ -73,7 +73,7 @@ export function routePlanPdfFileName(plan: RoutePlanPdfPlan) {
   // For an email fallback use just the part before "@", and cap the length so file names stay manageable.
   const base = who.includes("@") ? who.split("@")[0] : who
   const safe = base.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "").toLowerCase().slice(0, 40)
-  return `route_plan_${safe}_${plan.weekStart}.pdf`
+  return `${safe}_${plan.weekStart}.pdf`
 }
 
 /**
