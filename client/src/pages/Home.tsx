@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
-import { ArrowRight, CalendarDays, Check, ChevronDown, LogOut, Plus, Trash2 } from "lucide-react"
+import { ArrowRight, CalendarDays, Check, ChevronDown, Lock, LogOut, Plus, Trash2 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
 import LoadingScreen from "@/components/LoadingScreen"
 import { LUNCH_ALLOWANCE_PER_DAY, computePlanCosts } from "@shared/planCost"
@@ -531,12 +531,24 @@ function DayCard({ day, index, cardId, routes, error, canRemove, onRemove, onRem
       {routes.length < 7 && <Button type="button" variant="outline" className="mt-3 h-10 w-full rounded-xl border-dashed text-[#143f37]" onClick={() => onChange(routes.length, "from", "")}>
         <Plus size={16} /> Add another visit on {day}
       </Button>}
-      {active && (
-        <div className="mt-3 flex items-center justify-between rounded-xl bg-[#f3f6ef] px-3 py-2 text-xs text-[#5b7266]">
-          <span>Lunch allowance (once per day)</span>
-          <span className="font-semibold text-[#143f37]">+ Ksh {LUNCH_ALLOWANCE_PER_DAY.toFixed(2)}</span>
+      {/* Always visible, never editable: the amount is fixed and only kicks in once the day has data */}
+      <div className="mt-3">
+        <Label htmlFor={`lunch-${day}`} className="text-xs text-[#77877d]">Lunch allowance (Ksh) · fixed</Label>
+        <div className="relative mt-1">
+          <Input
+            id={`lunch-${day}`}
+            readOnly
+            tabIndex={-1}
+            aria-readonly="true"
+            value={(active ? LUNCH_ALLOWANCE_PER_DAY : 0).toFixed(2)}
+            className={`h-11 rounded-xl border-[#dfe7df] bg-[#f3f6ef] pr-9 font-semibold cursor-not-allowed select-none focus-visible:ring-0 ${active ? "text-[#143f37]" : "text-[#9aa69e]"}`}
+          />
+          <Lock size={14} className="absolute right-3 top-3.5 text-[#8a978e]" aria-hidden="true" />
         </div>
-      )}
+        <p className="mt-1 text-[11px] text-[#8a978e]">
+          Ksh {LUNCH_ALLOWANCE_PER_DAY} is added once per day, as soon as you enter a visit. This can't be edited.
+        </p>
+      </div>
     </div> 
   )
 }
