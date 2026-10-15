@@ -4,6 +4,7 @@ import { systemRouter } from "./_core/systemRouter"
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc"
 import { TRPCError } from "@trpc/server"
 import { z } from "zod"
+import { computePlanCosts } from "@shared/planCost"
 import { createRoutePlan, getAllRoutePlans, getRoutePlansForUser, markRoutePlanReviewed } from "./db"
 
 export const dailyRouteSchema = z.object({
@@ -25,10 +26,12 @@ export const routePlanInputSchema = z.object(
 )
 
 export function buildRoutePlanInsert(userId: number, input: z.infer<typeof routePlanInputSchema>) {
-  return { 
-    submittedBy: userId, 
-    weekStart: input.weekStart, 
-    totalCost: input.totalCost.toFixed(2), 
+  return {
+    submittedBy: userId,
+    weekStart: input.weekStart,
+    // The total is always recomputed here (transport + fixed lunch allowance per day) so the
+    // lunch money can't be altered by a client-supplied totalCost.
+    totalCost: computePlanCosts(input.dailyRoutes).totalCost.toFixed(2),
     routeDetails: input.dailyRoutes 
   }
 }

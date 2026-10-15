@@ -27,7 +27,19 @@ describe("routePlans authorization", () => {
 
   it("maps a valid plan into normalized persistence details", () => {
     const input = routePlanInputSchema.parse({ weekStart: "2026-08-24", totalCost: 12.5, dailyRoutes: [{ day: "Monday", from: "Warehouse", to: "Central Market", plannedArrival: "08:00", departure: "17:00", transportMode: "Car", cost: 12.5 }] });
-    expect(buildRoutePlanInsert(7, input)).toMatchObject({ submittedBy: 7, weekStart: "2026-08-24", totalCost: "12.50", routeDetails: input.dailyRoutes });
+    // 12.50 transport + 150 lunch allowance for the one day with data
+    expect(buildRoutePlanInsert(7, input)).toMatchObject({ submittedBy: 7, weekStart: "2026-08-24", totalCost: "162.50", routeDetails: input.dailyRoutes });
+  });
+
+  it("ignores a client-supplied total so the lunch allowance can't be changed", () => {
+    const route = { from: "A", to: "B", plannedArrival: "08:00", departure: "17:00", transportMode: "Car" as const, cost: 100 };
+    const input = routePlanInputSchema.parse({
+      weekStart: "2026-08-24",
+      totalCost: 1, // tampered
+      dailyRoutes: [{ day: "Monday", ...route }, { day: "Monday", ...route }, { day: "Tuesday", ...route }],
+    });
+    // 300 transport + 2 days x 150 lunch
+    expect(buildRoutePlanInsert(7, input).totalCost).toBe("600.00");
   });
 
   it("rejects incomplete daily route details", async () => {
