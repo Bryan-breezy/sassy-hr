@@ -533,7 +533,7 @@ function DayCard({ day, index, cardId, routes, error, canRemove, onRemove, onRem
       </Button>}
       {active && (
         <div className="mt-3 flex items-center justify-between rounded-xl bg-[#f3f6ef] px-3 py-2 text-xs text-[#5b7266]">
-          <span>Lunch allowance (once per day)</span>
+          <span>Lunch allowance</span>
           <span className="font-semibold text-[#143f37]">+ Ksh {LUNCH_ALLOWANCE_PER_DAY.toFixed(2)}</span>
         </div>
       )}
