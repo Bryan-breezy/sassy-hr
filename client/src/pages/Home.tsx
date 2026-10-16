@@ -266,15 +266,8 @@ export default function Home() {
       <header className="border-b border-[#dfe7df] bg-[#f6f7f4]/90 backdrop-blur sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 sm:h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img
-              src="/sassy-logo-stacked.png"
-              alt="Sassy Cosmetics – For a Sassy Look"
-              width={192}
-              height={211}
-              className="h-12 sm:h-16 w-auto shrink-0"
-            />
             <div>
-              <div className="font-semibold tracking-tight text-base sm:text-lg max-w-[180px] sm:max-w-none truncate">Sassy Cosmetic &amp; Beauty Products (K) Limited</div>
+              <div className="font-semibold tracking-tight text-base sm:text-lg max-w-[220px] sm:max-w-none truncate">Sassy Cosmetic &amp; Beauty Products (K) Limited</div>
               <div className="text-[11px] sm:text-xs text-[#6d8075]">Merchandisers weekly Route Plan</div>
             </div>
           </div>
