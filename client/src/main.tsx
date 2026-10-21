@@ -9,6 +9,21 @@ import "./index.css";
 
 const queryClient = new QueryClient();
 
+// After a new release, a tab that was already open still points at old script file names, which no
+// longer exist. Vite reports that as "vite:preloadError"; reload once to pick up the current files.
+// The timestamp guard stops a reload loop if the files are genuinely missing.
+window.addEventListener("vite:preloadError", event => {
+  event.preventDefault();
+  try {
+    const last = Number(sessionStorage.getItem("chunk-reload-at") || 0);
+    if (Date.now() - last < 30_000) return;
+    sessionStorage.setItem("chunk-reload-at", String(Date.now()));
+  } catch {
+    // sessionStorage unavailable: reload anyway, the page will just load fresh files
+  }
+  window.location.reload();
+});
+
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;

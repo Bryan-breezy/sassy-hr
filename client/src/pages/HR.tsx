@@ -159,7 +159,16 @@ export default function HR() {
       return true
     } catch (err) {
       console.error("Failed to generate route plan PDF", err)
-      toast.error("The PDF report could not be generated")
+      const message = err instanceof Error ? err.message : String(err)
+      // A tab left open across a new release asks for script files that no longer exist. A reload
+      // fetches the current files, so do that instead of leaving the user stuck on an error.
+      const staleBundle = /dynamically imported module|importing a module script|loading chunk|loading css chunk/i.test(message)
+      if (staleBundle) {
+        toast.error("The app was just updated. Reloading so your PDF can be generated…")
+        window.setTimeout(() => window.location.reload(), 1500)
+      } else {
+        toast.error(`The PDF report could not be generated${message ? ` (${message.slice(0, 120)})` : ""}`)
+      }
       return false
     }
   }
