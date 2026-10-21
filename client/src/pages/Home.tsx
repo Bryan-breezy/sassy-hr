@@ -596,9 +596,6 @@ function DayCard({ day, index, cardId, routes, nightOut, onNightOutChange, error
         {nightOut.on && (
           <div className="mt-3">
             <Field label="Amount spent (Ksh)" inputMode="decimal" value={nightOut.amount} placeholder="0.00" onChange={v => onNightOutChange({ amount: v })} />
-            {!active && (
-              <p className="mt-1.5 text-[11px] text-[#8a978e]">Counted once you add a visit for {day}.</p>
-            )}
           </div>
         )}
       </div>
