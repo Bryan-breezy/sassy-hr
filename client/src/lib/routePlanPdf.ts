@@ -1,3 +1,5 @@
+import type { RowInput } from "jspdf-autotable"
+import { LUNCH_ALLOWANCE_PER_DAY, computePlanCosts } from "@shared/planCost"
 import { ROUTE_PLAN_PDF_CONFIG as CONFIG } from "./routePlanPdfTemplate"
 
 export type RoutePlanPdfRoute = {
@@ -8,6 +10,8 @@ export type RoutePlanPdfRoute = {
   departure: string
   transportMode: string
   cost: number | string
+  /** Optional night-out amount for the day (stored on the day's first visit). */
+  nightOutCost?: number | string | null
 }
 
 export type RoutePlanPdfPlan = {
@@ -159,13 +163,37 @@ export async function downloadRoutePlanPdf(plan: RoutePlanPdfPlan, options: Rout
   // ---- Route table ----
   const columns = CONFIG.columns
   const costIndex = columns.findIndex((c) => c.key === "cost")
-  // Total row: label spans every column before "cost", then the total, then any trailing columns blank.
-  const footRow =
+  // Cost summary rows. The label spans every column before "cost", then the amount, then any trailing
+  // columns blank. The breakdown (transport / lunch / night out) is only shown when it adds up to the saved
+  // total, so older plans that never had lunch money still print just their total.
+  const costs = computePlanCosts(routes)
+  const showBreakdown = routes.length > 0 && Math.abs(Number(plan.totalCost) - costs.totalCost) < 0.01
+  const trailingBlanks = Math.max(columns.length - costIndex - 1, 0)
+  const footLine = (label: string, amount: number | string, strong: boolean): RowInput => {
+    const fontStyle = strong ? ("bold" as const) : ("normal" as const)
+    return [
+      { content: label, colSpan: costIndex, styles: { halign: "right" as const, fontStyle } },
+      { content: formatMoney(amount), styles: { fontStyle } },
+      ...Array<string>(trailingBlanks).fill(""),
+    ]
+  }
+  const footRows: RowInput[] | undefined =
     costIndex > 0
       ? [
-          { content: "Total estimated cost", colSpan: costIndex, styles: { halign: "right" as const } },
-          formatMoney(plan.totalCost),
-          ...Array<string>(columns.length - costIndex - 1).fill(""),
+          ...(showBreakdown
+            ? [
+                footLine("Transport", costs.transportCost, false),
+                footLine(
+                  `Lunch allowance (${costs.daysWithData} day${costs.daysWithData === 1 ? "" : "s"} x ${LUNCH_ALLOWANCE_PER_DAY})`,
+                  costs.lunchCost,
+                  false
+                ),
+                ...(costs.nightOutCost > 0
+                  ? [footLine(`Night out allowance (${costs.nightOutDays.map((d) => d.slice(0, 3)).join(", ")})`, costs.nightOutCost, false)]
+                  : []),
+              ]
+            : []),
+          footLine("Total estimated cost", plan.totalCost, true),
         ]
       : undefined
   autoTable(doc, {
@@ -180,7 +208,7 @@ export async function downloadRoutePlanPdf(plan: RoutePlanPdfPlan, options: Rout
           })
         )
       : [[{ content: "No route days recorded", colSpan: columns.length, styles: { halign: "center" } }]],
-    foot: footRow ? [footRow] : undefined,
+    foot: footRows,
     showFoot: "lastPage",
     theme: "grid",
     styles: { font: "helvetica", fontSize: 9, cellPadding: 2.5, lineColor: [215, 221, 227], lineWidth: 0.2, textColor: [34, 48, 71] },

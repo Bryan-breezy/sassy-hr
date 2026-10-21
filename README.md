@@ -22,8 +22,10 @@ id | submittedBy | weekStart | totalCost | status | submittedAt | updatedAt
 `RoutePlanDays`
 
 ```text
-id | routePlanId | day | from | to | plannedArrival | departure | transportMode | cost
+id | routePlanId | day | from | to | plannedArrival | departure | transportMode | cost | nightOutCost
 ```
+
+`nightOutCost` is the optional night-out allowance for that day (stored on the day's first visit, `0` otherwise). If your sheet was created before this column existed, add the `nightOutCost` header in cell `J1` of `RoutePlanDays`; older rows can stay blank.
 
 3. Open **Extensions -> Apps Script** in the spreadsheet.
 4. Copy the contents of `google-apps-script.gs` into the Apps Script editor.

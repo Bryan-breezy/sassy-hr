@@ -42,6 +42,27 @@ describe("routePlans authorization", () => {
     expect(buildRoutePlanInsert(7, input).totalCost).toBe("600.00");
   });
 
+  it("includes an optional night out in the server-computed total", () => {
+    const route = { from: "A", to: "B", plannedArrival: "08:00", departure: "17:00", transportMode: "Car" as const, cost: 100 };
+    const input = routePlanInputSchema.parse({
+      weekStart: "2026-08-24",
+      totalCost: 0,
+      dailyRoutes: [{ day: "Monday", ...route, nightOutCost: 2000 }, { day: "Monday", ...route }],
+    });
+    // 200 transport + 150 lunch (1 day) + 2000 night out
+    expect(buildRoutePlanInsert(7, input).totalCost).toBe("2350.00");
+    expect(input.dailyRoutes[1].nightOutCost).toBe(0); // omitted -> defaults to 0
+  });
+
+  it("rejects a negative night out amount", () => {
+    const result = routePlanInputSchema.safeParse({
+      weekStart: "2026-08-24",
+      totalCost: 0,
+      dailyRoutes: [{ day: "Monday", from: "A", to: "B", plannedArrival: "08:00", departure: "17:00", transportMode: "Car", cost: 0, nightOutCost: -1 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("rejects incomplete daily route details", async () => {
     const caller = appRouter.createCaller(context(merchandizer));
     await expect(caller.routePlans.create({ weekStart: "2026-08-24", totalCost: 12, dailyRoutes: [{ day: "Monday", from: "", to: "B", plannedArrival: "08:00", departure: "17:00", transportMode: "Car", cost: 12 }] })).rejects.toMatchObject({ code: "BAD_REQUEST" });

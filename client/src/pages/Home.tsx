@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { ArrowRight, CalendarDays, Check, ChevronDown, LogOut, Plus, Trash2 } from "lucide-react"
@@ -37,6 +38,13 @@ const blankRoutes = (): Record<string, RouteDraft[]> => Object.fromEntries(
   DAYS.map(day => [day, [blankRoute()]])
 )
 
+// Optional per-day night-out allowance: tick the box, then enter the amount spent
+type NightOutDraft = { on: boolean; amount: string }
+const blankNightOut = (): NightOutDraft => ({ on: false, amount: "" })
+const blankNightOuts = (): Record<string, NightOutDraft> => Object.fromEntries(
+  DAYS.map(day => [day, blankNightOut()])
+)
+
 // ─── Draft autosave ──────────────────────────────────────────────────────
 // Keeps an in-progress route plan in localStorage so a merchandiser doesn't
 // lose their work to an accidental refresh, tab close, or lost connection.
@@ -46,6 +54,7 @@ type Draft = {
   weekStart: string
   routes: Record<string, RouteDraft[]>
   activeDays: string[]
+  nightOut: Record<string, NightOutDraft>
 }
 
 function isValidRouteDraft(value: any): value is RouteDraft {
@@ -87,7 +96,15 @@ function loadDraft(): Draft | null {
 
     if (!hasDraftContent(routes)) return null
 
-    return { weekStart: parsed.weekStart, routes, activeDays }
+    const nightOut = blankNightOuts()
+    for (const day of DAYS) {
+      const saved = parsed.nightOut?.[day]
+      if (saved && typeof saved.on === "boolean" && typeof saved.amount === "string") {
+        nightOut[day] = { on: saved.on, amount: saved.amount }
+      }
+    }
+
+    return { weekStart: parsed.weekStart, routes, activeDays, nightOut }
   } catch {
     // Corrupted or unreadable draft — treat as if there wasn't one
     return null
@@ -126,6 +143,7 @@ export default function Home() {
   const [routes, setRoutes] = useState<Record<string, RouteDraft[]>>(initialDraft?.routes ?? blankRoutes())
   // Keep track of which days the merchandiser has activated to fill in (starts with Monday active)
   const [activeDays, setActiveDays] = useState<Set<string>>(() => new Set(initialDraft?.activeDays ?? ["Monday"]))
+  const [nightOut, setNightOut] = useState<Record<string, NightOutDraft>>(initialDraft?.nightOut ?? blankNightOuts())
   const [openPlan, setOpenPlan] = useState<number | null>(null)
   const [dayErrors, setDayErrors] = useState<Record<string, string>>({})
   const utils = trpc.useUtils()
@@ -140,16 +158,17 @@ export default function Home() {
   // Autosave the in-progress plan to localStorage as it changes
   useEffect(() => {
     if (hasDraftContent(routes)) {
-      saveDraft({ weekStart, routes, activeDays: Array.from(activeDays) })
+      saveDraft({ weekStart, routes, activeDays: Array.from(activeDays), nightOut })
     } else {
       clearDraft()
     }
-  }, [weekStart, routes, activeDays])
+  }, [weekStart, routes, activeDays, nightOut])
 
   const createPlan = trpc.routePlans.create.useMutation({
     onSuccess: () => { 
       toast.success("Successfully submitted to HR") 
       setRoutes(blankRoutes()) 
+      setNightOut(blankNightOuts())
       setActiveDays(new Set(["Monday"]));
       setDayErrors({}); 
       clearDraft();
@@ -161,14 +180,18 @@ export default function Home() {
   const mine = trpc.routePlans.mine.useQuery(undefined, { enabled: isAuthenticated })
 
   // A day is active for submission if it is enabled and the user entered a location or filled fields
+  // A day's optional night-out amount rides on that day's first visit (other visits carry 0), and only
+  // counts when the box is ticked and the day actually has a visit.
   const activeRoutes = useMemo(() => {
-    return DAYS.filter(day => activeDays.has(day))
-      .flatMap(day => routes[day].map(route => ({ day, ...route })))
-      .filter(route => route.from.trim() || route.to.trim())
-  }, [routes, activeDays])
+    return DAYS.filter(day => activeDays.has(day)).flatMap(day => {
+      const dayVisits = routes[day].filter(route => route.from.trim() || route.to.trim())
+      const night = nightOut[day]?.on ? Number(nightOut[day].amount) || 0 : 0
+      return dayVisits.map((route, i) => ({ day, ...route, nightOutCost: i === 0 ? night : 0 }))
+    })
+  }, [routes, activeDays, nightOut])
 
   // activeRoutes only holds visits with data, so lunch money is added only for days that have some
-  const { transportCost, daysWithData, lunchCost, totalCost } = useMemo(() => computePlanCosts(activeRoutes), [activeRoutes])
+  const { transportCost, daysWithData, lunchCost, nightOutCost, totalCost } = useMemo(() => computePlanCosts(activeRoutes), [activeRoutes])
 
   const toggleDay = (day: string) => {
     setActiveDays(current => {
@@ -180,6 +203,7 @@ export default function Home() {
         }
         next.delete(day)
         setRoutes(curr => ({ ...curr, [day]: [blankRoute()] }))
+        setNightOut(curr => ({ ...curr, [day]: blankNightOut() }))
         setDayErrors(curr => {
           const updated = { ...curr }
           delete updated[day]
@@ -215,6 +239,16 @@ export default function Home() {
         else if (route.cost && (!Number.isFinite(Number(route.cost)) || Number(route.cost) < 0)) message = "Enter a valid non-negative cost."
         if (message && !errors[day]) errors[day] = `Entry ${index + 1}: ${message}`
       })
+
+      // Night out is optional, but once ticked on a day with visits it needs a valid amount
+      const hasVisits = routes[day].some(route => route.from.trim() || route.to.trim())
+      const night = nightOut[day]
+      if (hasVisits && night?.on && !errors[day]) {
+        const amount = night.amount.trim()
+        if (!amount || !Number.isFinite(Number(amount)) || Number(amount) < 0) {
+          errors[day] = "Night out allowance: enter the amount spent (or untick the box)."
+        }
+      }
     })
 
     setDayErrors(errors);
@@ -254,6 +288,7 @@ export default function Home() {
         departure: route.departure.trim() || "11:30",
         transportMode: route.transportMode,
         cost: Number(route.cost) || 0,
+        nightOutCost: route.nightOutCost,
       })),
     });
   };
@@ -386,6 +421,11 @@ export default function Home() {
                       index={index}
                       cardId={`route-day-${day}`}
                       routes={routes[day]}
+                      nightOut={nightOut[day] ?? blankNightOut()}
+                      onNightOutChange={patch => {
+                        setNightOut(current => ({ ...current, [day]: { ...(current[day] ?? blankNightOut()), ...patch } }))
+                        setDayErrors(current => ({ ...current, [day]: "" }))
+                      }}
                       error={dayErrors[day]}
                       onRemove={() => toggleDay(day)}
                       canRemove={activeDays.size > 1}
@@ -413,6 +453,7 @@ export default function Home() {
                   <div className="mt-1 text-[11px] sm:text-xs text-[#75877b]">
                     Transport Ksh {transportCost.toFixed(2)} + Lunch Ksh {lunchCost.toFixed(2)}
                     {daysWithData > 0 && ` (${daysWithData} day${daysWithData === 1 ? "" : "s"} × ${LUNCH_ALLOWANCE_PER_DAY})`}
+                    {nightOutCost > 0 && ` + Night out Ksh ${nightOutCost.toFixed(2)}`}
                   </div>
                 </div>
                 <div className="shrink-0 text-right">
@@ -468,11 +509,13 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
-function DayCard({ day, index, cardId, routes, error, canRemove, onRemove, onRemoveVisit, onChange }: {
+function DayCard({ day, index, cardId, routes, nightOut, onNightOutChange, error, canRemove, onRemove, onRemoveVisit, onChange }: {
   day: string
   index: number
   cardId?: string
   routes: RouteDraft[]
+  nightOut: NightOutDraft
+  onNightOutChange: (patch: Partial<NightOutDraft>) => void
   error?: string
   canRemove: boolean
   onRemove: () => void
@@ -537,6 +580,28 @@ function DayCard({ day, index, cardId, routes, error, canRemove, onRemove, onRem
           <span className="font-semibold text-[#143f37]">+ Ksh {LUNCH_ALLOWANCE_PER_DAY.toFixed(2)}</span>
         </div>
       )}
+
+      {/* Optional night out: tick the box, then enter the amount spent */}
+      <div className="mt-3 rounded-xl border border-[#edf0eb] bg-white p-3">
+        <div className="flex items-center gap-2.5">
+          <Checkbox
+            id={`night-out-${day}`}
+            checked={nightOut.on}
+            onCheckedChange={checked => onNightOutChange(checked === true ? { on: true } : { on: false, amount: "" })}
+          />
+          <Label htmlFor={`night-out-${day}`} className="cursor-pointer text-sm font-medium text-[#18352f]">
+            Night out allowance <span className="text-xs font-normal text-[#8a978e]">(optional)</span>
+          </Label>
+        </div>
+        {nightOut.on && (
+          <div className="mt-3">
+            <Field label="Amount spent (Ksh)" inputMode="decimal" value={nightOut.amount} placeholder="0.00" onChange={v => onNightOutChange({ amount: v })} />
+            {!active && (
+              <p className="mt-1.5 text-[11px] text-[#8a978e]">Counted once you add a visit for {day}.</p>
+            )}
+          </div>
+        )}
+      </div>
     </div> 
   )
 }
@@ -608,6 +673,9 @@ function PlanRow({ plan, openPlan, setOpenPlan }: {
               <div className="text-xs text-[#89968d] mt-1">
                 {route.plannedArrival}–{route.departure} · {route.transportMode} · Ksh {Number(route.cost).toFixed(2)}
               </div>
+              {Number(route.nightOutCost) > 0 && (
+                <div className="text-xs font-medium text-[#8b5e3c] mt-1">Night out · Ksh {Number(route.nightOutCost).toFixed(2)}</div>
+              )}
             </div>
           ))}
           {lunchIncluded && (
@@ -615,6 +683,7 @@ function PlanRow({ plan, openPlan, setOpenPlan }: {
               <span className="text-[#5b7266]">
                 Transport Ksh {costs.transportCost.toFixed(2)} + Lunch allowance Ksh {costs.lunchCost.toFixed(2)}
                 {` (${costs.daysWithData} day${costs.daysWithData === 1 ? "" : "s"} × ${LUNCH_ALLOWANCE_PER_DAY})`}
+                {costs.nightOutCost > 0 && ` + Night out Ksh ${costs.nightOutCost.toFixed(2)}`}
               </span>
               <span className="font-semibold text-[#143f37]">Total Ksh {Number(plan.totalCost).toFixed(2)}</span>
             </div>

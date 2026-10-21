@@ -15,6 +15,8 @@ export const dailyRouteSchema = z.object({
   departure: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   transportMode: z.enum(["Walking", "Public transport", "Motorcycle", "Car", "Taxi", "Other"]),
   cost: z.number().min(0).max(100000),
+  // Optional night-out allowance for that day (kept on the day's first visit; 0 when not claimed)
+  nightOutCost: z.number().min(0).max(100000).default(0),
 })
  
 export const routePlanInputSchema = z.object(
@@ -29,8 +31,8 @@ export function buildRoutePlanInsert(userId: number, input: z.infer<typeof route
   return {
     submittedBy: userId,
     weekStart: input.weekStart,
-    // The total is always recomputed here (transport + fixed lunch allowance per day) so the
-    // lunch money can't be altered by a client-supplied totalCost.
+    // The total is always recomputed here (transport + fixed lunch allowance per day + any night out)
+    // so the lunch money can't be altered by a client-supplied totalCost.
     totalCost: computePlanCosts(input.dailyRoutes).totalCost.toFixed(2),
     routeDetails: input.dailyRoutes 
   }

@@ -18,6 +18,7 @@ import { Link } from "wouter"
 import { toast } from "sonner"
 import LoadingScreen from "@/components/LoadingScreen"
 import { downloadRoutePlanPdf } from "@/lib/routePlanPdf"
+import { LUNCH_ALLOWANCE_PER_DAY, computePlanCosts } from "@shared/planCost"
 
 export default function HR() {
   const { user, loading, isAuthenticated, logout } = useAuth()
@@ -62,6 +63,12 @@ export default function HR() {
   }, [plans.data, filter, search])
 
   const selected = visiblePlans.find((plan) => plan.id === selectedId) || visiblePlans[0]
+  const selectedCosts = selected ? computePlanCosts(selected.dailyRoutes ?? []) : null
+  const selectedBreakdown =
+    selected && selectedCosts && (selected.dailyRoutes?.length ?? 0) > 0 &&
+    Math.abs(Number(selected.totalCost) - selectedCosts.totalCost) < 0.01
+      ? selectedCosts
+      : null
   const submitted = plans.data?.filter((plan) => plan.status === "submitted").length || 0
   const reviewed = plans.data?.filter((plan) => plan.status === "reviewed").length || 0
 
@@ -85,6 +92,7 @@ export default function HR() {
       "Departure",
       "Transport Mode",
       "Cost (Ksh)",
+      "Night Out (Ksh)",
     ]
 
     const rows: string[][] = []
@@ -105,6 +113,7 @@ export default function HR() {
             r.departure,
             r.transportMode,
             Number(r.cost).toFixed(2),
+            Number((r as any).nightOutCost || 0).toFixed(2),
           ])
         })
       } else {
@@ -120,6 +129,7 @@ export default function HR() {
           "-",
           "-",
           "-",
+          "0.00",
           "0.00",
         ])
       }
@@ -519,6 +529,13 @@ export default function HR() {
                       <div className="text-2xl font-bold text-[#1f354d] mt-0.5">
                         Ksh {Number(selected.totalCost).toFixed(2)}
                       </div>
+                      {selectedBreakdown && (
+                        <div className="mt-1 text-xs text-[#718496]">
+                          Transport Ksh {selectedBreakdown.transportCost.toFixed(2)} + Lunch Ksh {selectedBreakdown.lunchCost.toFixed(2)}
+                          {` (${selectedBreakdown.daysWithData} × ${LUNCH_ALLOWANCE_PER_DAY})`}
+                          {selectedBreakdown.nightOutCost > 0 && ` + Night out Ksh ${selectedBreakdown.nightOutCost.toFixed(2)}`}
+                        </div>
+                      )}
                     </div>
                     <div className="text-right">
                       <div className="text-xs uppercase tracking-[.12em] text-[#718496] font-medium">
@@ -563,6 +580,11 @@ export default function HR() {
                             {route.transportMode}
                           </span>
                         </div>
+                        {Number(route.nightOutCost) > 0 && (
+                          <div className="mt-2 text-xs font-semibold text-[#8b6a32]">
+                            Night out · Ksh {Number(route.nightOutCost).toFixed(2)}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

@@ -34,6 +34,7 @@ type DailyRoute = {
   departure: string;
   transportMode: string;
   cost: number;
+  nightOutCost?: number;
 };
 
 function getCredentials() {
@@ -103,7 +104,7 @@ function mapPlan(row: string[]): PlanRow {
 }
 
 function mapDailyRoute(row: string[]): DailyRoute {
-  return { id: asNumber(row[0]), routePlanId: asNumber(row[1]), day: row[2] ?? "", from: row[3] ?? "", to: row[4] ?? "", plannedArrival: row[5] ?? "", departure: row[6] ?? "", transportMode: row[7] ?? "", cost: asNumber(row[8]) };
+  return { id: asNumber(row[0]), routePlanId: asNumber(row[1]), day: row[2] ?? "", from: row[3] ?? "", to: row[4] ?? "", plannedArrival: row[5] ?? "", departure: row[6] ?? "", transportMode: row[7] ?? "", cost: asNumber(row[8]), nightOutCost: asNumber(row[9]) };
 }
 
 async function getUsers() {
@@ -115,7 +116,7 @@ async function getPlans() {
 }
 
 async function getDays() {
-  return (await readRows("RoutePlanDays!A2:I")).filter(row => row.length).map(mapDailyRoute);
+  return (await readRows("RoutePlanDays!A2:J")).filter(row => row.length).map(mapDailyRoute);
 }
 
 export async function upsertUser(user: { openId: string; username?: string | null; name?: string | null; email?: string | null; passwordHash?: string | null; loginMethod?: string | null; role?: "user" | "admin"; lastSignedIn?: Date }) {
@@ -165,7 +166,7 @@ export async function createRoutePlan(plan: { submittedBy: number; weekStart: st
   const days = await getDays();
   let nextDayId = days.reduce((max, item) => Math.max(max, item.id ?? 0), 0) + 1;
   for (const route of plan.routeDetails) {
-    await appendRow("RoutePlanDays!A:I", [nextDayId++, id, route.day, route.from, route.to, route.plannedArrival, route.departure, route.transportMode, route.cost.toFixed(2)]);
+    await appendRow("RoutePlanDays!A:J", [nextDayId++, id, route.day, route.from, route.to, route.plannedArrival, route.departure, route.transportMode, route.cost.toFixed(2), (route.nightOutCost ?? 0).toFixed(2)]);
   }
   return { id };
 }
