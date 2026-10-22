@@ -5,7 +5,7 @@ import { Route, Switch } from "wouter";
 import { lazy, Suspense } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import LoadingScreen from "@/components/LoadingScreen";
+import PageSkeleton from "@/components/PageSkeleton";
 import Home from "./pages/Home";
 import SignIn from "./pages/SignIn";
 
@@ -16,7 +16,7 @@ const HR = lazy(() => import("./pages/HR"));
 function Router() {
   // make sure to consider if you need authentication for certain routes
   return (
-    <Suspense fallback={<LoadingScreen />}>
+    <Suspense fallback={<PageSkeleton />}>
       <Switch>
         <Route path={"/"} component={Home} />
         <Route path={"/hr"} component={HR} />

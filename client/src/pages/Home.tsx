@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useAuth } from "@/_core/hooks/useAuth"
 import { trpc } from "@/lib/trpc"
-import LoadingScreen from "@/components/LoadingScreen"
+import PageSkeleton from "@/components/PageSkeleton"
 import HomeHeader from "@/components/HomeHeader"
 import RecentSubmissions from "@/components/RecentSubmissions"
 import RouteOverview from "@/components/RouteOverview"
@@ -14,8 +14,7 @@ export default function Home() {
   const routePlan = useRoutePlan(isAuthenticated)
   const mine = trpc.routePlans.mine.useQuery(undefined, { enabled: isAuthenticated })
 
-  if (loading || !isAuthenticated) return <LoadingScreen />
-  if (mine.isLoading) return <LoadingScreen />
+  if (loading || !isAuthenticated || mine.isLoading) return <PageSkeleton page="home" />
 
   return (
     <div className="min-h-screen bg-[#f6f7f4] text-[#18352f]">
