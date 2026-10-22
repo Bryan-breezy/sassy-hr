@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Check, Plus, Trash2 } from "lucide-react"
 import { LUNCH_ALLOWANCE_PER_DAY } from "@shared/planCost"
+import NightOutAllowance, { type NightOutDraft } from "@/components/NightOutAllowance"
 
 export const TRANSPORT_MODES = ["Walking", "Public transport", "Motorcycle", "Car", "Taxi", "Other"] as const
 
@@ -26,9 +27,11 @@ type RouteDayCardProps = {
   onRemove: () => void
   onRemoveVisit: (routeIndex: number) => void
   onChange: (routeIndex: number, field: keyof RouteDraft, value: string) => void
+  nightOut: NightOutDraft
+  onNightOutChange: (patch: Partial<NightOutDraft>) => void
 }
 
-export default function RouteDayCard({ day, index, cardId, routes, error, canRemove, onRemove, onRemoveVisit, onChange }: RouteDayCardProps) {
+export default function RouteDayCard({ day, index, cardId, routes, error, canRemove, onRemove, onRemoveVisit, onChange, nightOut, onNightOutChange }: RouteDayCardProps) {
   const active = routes.some(route => route.from.trim() || route.to.trim())
   return (
     <div id={cardId} tabIndex={-1} className={`scroll-mt-24 rounded-2xl border ${active ? "border-[#c8d8c5] bg-[#fbfcf8]" : "border-[#edf0eb] bg-white"} ${error ? "border-[#b85f46]" : ""} p-3.5 sm:p-4 transition-all`}>
@@ -87,6 +90,7 @@ export default function RouteDayCard({ day, index, cardId, routes, error, canRem
           <span className="font-semibold text-[#143f37]">+ Ksh {LUNCH_ALLOWANCE_PER_DAY.toFixed(2)}</span>
         </div>
       )}
+      <NightOutAllowance day={day} value={nightOut} onChange={onNightOutChange} />
     </div>
   )
 }

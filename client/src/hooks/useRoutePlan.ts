@@ -5,10 +5,7 @@ import { trpc } from "@/lib/trpc"
 import { computePlanCosts } from "@shared/planCost"
 import { TRANSPORT_MODES, type RouteDraft } from "@/components/RouteDayCard"
 import { blankNightOut, type NightOutDraft } from "@/components/NightOutAllowance"
-
-const [nightOut, setNightOut] = useState<Record<string, NightOutDraft>>(
-  () => Object.fromEntries(DAYS.map(d => [d, blankNightOut()]))
-)
+import { buildDailyRoutePayload, isValidNightOutAmount } from "@/lib/routePlanSubmission"
 
 export const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
@@ -18,6 +15,7 @@ type Draft = {
   weekStart: string
   routes: Record<string, RouteDraft[]>
   activeDays: string[]
+  nightOut?: Record<string, NightOutDraft>
 }
 
 const blankRoute = (): RouteDraft => ({
@@ -71,7 +69,15 @@ function loadDraft(): Draft | null {
     }
 
     if (!hasDraftContent(routes)) return null
-    return { weekStart: parsed.weekStart, routes, activeDays }
+    const nightOut: Record<string, NightOutDraft> = Object.fromEntries(
+      DAYS.map(day => {
+        const value = parsed.nightOut?.[day]
+        return [day, value && typeof value.enabled === "boolean" && typeof value.amount === "string"
+          ? { enabled: value.enabled, amount: value.amount }
+          : blankNightOut()]
+      })
+    )
+    return { weekStart: parsed.weekStart, routes, activeDays, nightOut }
   } catch {
     return null
   }
@@ -107,6 +113,9 @@ export default function useRoutePlan(isAuthenticated: boolean) {
   const [routes, setRoutes] = useState<Record<string, RouteDraft[]>>(initialDraft?.routes ?? blankRoutes())
   const [activeDays, setActiveDays] = useState<Set<string>>(() => new Set(initialDraft?.activeDays ?? ["Monday"]))
   const [dayErrors, setDayErrors] = useState<Record<string, string>>({})
+  const [nightOut, setNightOut] = useState<Record<string, NightOutDraft>>(
+    () => initialDraft?.nightOut ?? Object.fromEntries(DAYS.map(day => [day, blankNightOut()]))
+  )
   const utils = trpc.useUtils()
 
   useEffect(() => {
@@ -116,17 +125,18 @@ export default function useRoutePlan(isAuthenticated: boolean) {
 
   useEffect(() => {
     if (hasDraftContent(routes)) {
-      saveDraft({ weekStart, routes, activeDays: Array.from(activeDays) })
+      saveDraft({ weekStart, routes, activeDays: Array.from(activeDays), nightOut })
     } else {
       clearDraft()
     }
-  }, [weekStart, routes, activeDays])
+  }, [weekStart, routes, activeDays, nightOut])
 
   const createPlan = trpc.routePlans.create.useMutation({
     onSuccess: () => {
       toast.success("Successfully submitted to HR")
       setRoutes(blankRoutes())
       setActiveDays(new Set(["Monday"]))
+      setNightOut(Object.fromEntries(DAYS.map(day => [day, blankNightOut()])))
       setDayErrors({})
       clearDraft()
       utils.routePlans.mine.invalidate()
@@ -135,10 +145,17 @@ export default function useRoutePlan(isAuthenticated: boolean) {
   })
 
   const activeRoutes = useMemo(() => {
-    return DAYS.filter(day => activeDays.has(day))
+    const activeDayRoutes = DAYS.filter(day => activeDays.has(day))
       .flatMap(day => routes[day].map(route => ({ day, ...route })))
       .filter(route => route.from.trim() || route.to.trim())
-  }, [routes, activeDays])
+    const firstRouteByDay = new Set<string>()
+    return activeDayRoutes.map(route => {
+      const firstVisit = !firstRouteByDay.has(route.day)
+      firstRouteByDay.add(route.day)
+      const allowance = nightOut[route.day]
+      return { ...route, nightOutCost: firstVisit && allowance?.enabled ? Number(allowance.amount) || 0 : 0 }
+    })
+  }, [routes, activeDays, nightOut])
 
   const costs = useMemo(() => computePlanCosts(activeRoutes), [activeRoutes])
 
@@ -152,6 +169,7 @@ export default function useRoutePlan(isAuthenticated: boolean) {
         }
         next.delete(day)
         setRoutes(currentRoutes => ({ ...currentRoutes, [day]: [blankRoute()] }))
+        setNightOut(currentNightOut => ({ ...currentNightOut, [day]: blankNightOut() }))
         setDayErrors(currentErrors => {
           const updated = { ...currentErrors }
           delete updated[day]
@@ -196,6 +214,10 @@ export default function useRoutePlan(isAuthenticated: boolean) {
 
     DAYS.forEach(day => {
       if (!activeDays.has(day)) return
+      const allowance = nightOut[day]
+      if (allowance?.enabled && !isValidNightOutAmount(allowance.amount)) {
+        errors[day] = "Enter a valid night-out amount between 0 and 100,000 Ksh."
+      }
       routes[day].forEach((route, index) => {
         const hasAny = route.from.trim() || route.to.trim() || route.cost.trim() || route.plannedArrival.trim() || route.departure.trim()
         if (!hasAny) return
@@ -238,15 +260,7 @@ export default function useRoutePlan(isAuthenticated: boolean) {
     createPlan.mutate({
       weekStart,
       totalCost: costs.totalCost,
-      dailyRoutes: activeRoutes.map(route => ({
-        day: route.day,
-        from: route.from.trim(),
-        to: route.to.trim(),
-        plannedArrival: route.plannedArrival.trim() || "09:00",
-        departure: route.departure.trim() || "11:30",
-        transportMode: route.transportMode,
-        cost: Number(route.cost) || 0,
-      })),
+      dailyRoutes: buildDailyRoutePayload(activeRoutes, nightOut),
     })
   }
 
@@ -266,6 +280,5 @@ export default function useRoutePlan(isAuthenticated: boolean) {
 
     nightOut,                              // Record<string, NightOutDraft>
     setNightOut,                           // React.Dispatch<React.SetStateAction<...>>
-    nightOutCost,
   }
 }

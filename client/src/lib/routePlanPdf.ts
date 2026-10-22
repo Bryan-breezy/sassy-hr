@@ -204,7 +204,9 @@ export async function downloadRoutePlanPdf(plan: RoutePlanPdfPlan, options: Rout
       ? routes.map((route) =>
           columns.map((c) => {
             const value = (route as Record<string, unknown>)[c.key]
-            return c.key === "cost" ? formatMoney(value as number | string) : String(value ?? "")
+            if (c.key === "cost") return formatMoney(value as number | string)
+            if (c.key === "nightOutCost") return Number(value) > 0 ? formatMoney(value as number | string) : "-"
+            return String(value ?? "")
           })
         )
       : [[{ content: "No route days recorded", colSpan: columns.length, styles: { halign: "center" } }]],

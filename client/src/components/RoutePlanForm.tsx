@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label"
 import RouteDayCard, { type RouteDraft } from "@/components/RouteDayCard"
 import { ArrowRight, CalendarDays, Plus } from "lucide-react"
 import { LUNCH_ALLOWANCE_PER_DAY } from "@shared/planCost"
-import NightOutAllowance, { type NightOutDraft } from "@/components/NightOutAllowance"
+import { blankNightOut, type NightOutDraft } from "@/components/NightOutAllowance"
 
 type RoutePlanFormProps = {
   days: string[]
@@ -41,6 +41,7 @@ export default function RoutePlanForm({
   lunchCost,
   daysWithData,
   totalCost,
+  nightOutCost = 0,
   isSubmitting,
   isAuthenticated,
   onWeekStartChange,
@@ -127,6 +128,7 @@ export default function RoutePlanForm({
             <div className="mt-1 text-[11px] sm:text-xs text-[#75877b]">
               Transport Ksh {transportCost.toFixed(2)} + Lunch Ksh {lunchCost.toFixed(2)}
               {daysWithData > 0 && ` (${daysWithData} day${daysWithData === 1 ? "" : "s"} × ${LUNCH_ALLOWANCE_PER_DAY})`}
+              {nightOutCost > 0 && ` + Night out Ksh ${nightOutCost.toFixed(2)}`}
             </div>
           </div>
           <div className="shrink-0 text-right">
