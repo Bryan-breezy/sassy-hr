@@ -27,6 +27,7 @@ export const ROUTE_PLAN_PDF_CONFIG = {
     { key: "departure",      header: "Departure" },
     { key: "transportMode",  header: "Transport" },
     { key: "cost",           header: "Cost (Ksh)" },
+    { key: "nightOutCost",   header: "Night out (Ksh)" },
   ],
 } as const;
 
