@@ -4,6 +4,11 @@ import { toast } from "sonner"
 import { trpc } from "@/lib/trpc"
 import { computePlanCosts } from "@shared/planCost"
 import { TRANSPORT_MODES, type RouteDraft } from "@/components/RouteDayCard"
+import { blankNightOut, type NightOutDraft } from "@/components/NightOutAllowance"
+
+const [nightOut, setNightOut] = useState<Record<string, NightOutDraft>>(
+  () => Object.fromEntries(DAYS.map(d => [d, blankNightOut()]))
+)
 
 export const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
@@ -258,5 +263,9 @@ export default function useRoutePlan(isAuthenticated: boolean) {
     removeVisit,
     changeRoute,
     handleSubmit,
+
+    nightOut,                              // Record<string, NightOutDraft>
+    setNightOut,                           // React.Dispatch<React.SetStateAction<...>>
+    nightOutCost,
   }
 }
