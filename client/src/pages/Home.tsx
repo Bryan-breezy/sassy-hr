@@ -55,6 +55,10 @@ export default function Home() {
             onRemoveVisit={routePlan.removeVisit}
             onChangeRoute={routePlan.changeRoute}
             onSubmit={routePlan.handleSubmit}
+
+            nightOut={routePlan.nightOut}
+            onNightOutChange={routePlan.setNightOut}
+            nightOutCost={routePlan.nightOutCost}
           />
         </div>
         <RecentSubmissions
