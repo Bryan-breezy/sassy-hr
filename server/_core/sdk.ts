@@ -104,16 +104,17 @@ class SDKServer {
   }
 
   async authenticateRequest(req: Request): Promise<User> {
-    // 1. Prefer the session cookie.
-    const cookies = this.parseCookies(this.getHeader(req, "cookie"));
-    let sessionToken = cookies.get(COOKIE_NAME);
+    // Prefer an explicit bearer token so a stale cookie from another account
+    // cannot override the session the client selected for this request.
+    const authHeader = this.getHeader(req, "authorization");
+    let sessionToken =
+      typeof authHeader === "string" && authHeader.startsWith("Bearer ")
+        ? authHeader.slice(7)
+        : undefined;
 
-    // 2. Fallback to the Authorization header (Bearer token).
     if (!sessionToken) {
-      const authHeader = this.getHeader(req, "authorization");
-      if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
-        sessionToken = authHeader.slice(7);
-      }
+      const cookies = this.parseCookies(this.getHeader(req, "cookie"));
+      sessionToken = cookies.get(COOKIE_NAME);
     }
 
     const session = await this.verifySession(sessionToken);
