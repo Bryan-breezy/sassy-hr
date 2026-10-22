@@ -16,7 +16,7 @@ import {  ArrowLeft, CheckCircle2, Clock3, Download, FileSpreadsheet, FileText, 
 import { trpc } from "@/lib/trpc"
 import { Link } from "wouter"
 import { toast } from "sonner"
-import LoadingScreen from "@/components/LoadingScreen"
+import PageSkeleton from "@/components/PageSkeleton"
 import { downloadRoutePlanPdf } from "@/lib/routePlanPdf"
 import { LUNCH_ALLOWANCE_PER_DAY, computePlanCosts } from "@shared/planCost"
 
@@ -182,7 +182,7 @@ export default function HR() {
     setConfirmReviewOpen(false)
   }
 
-  if (loading) return <LoadingScreen />
+  if (loading) return <PageSkeleton page="hr" />
 
   if (!isAuthenticated || user?.role !== "admin") {
     return (
@@ -210,7 +210,7 @@ export default function HR() {
     )
   }
 
-  if (plans.isLoading) { return <LoadingScreen /> }
+  if (plans.isLoading) { return <PageSkeleton page="hr" /> }
 
   if (plans.isError) {
     return (
