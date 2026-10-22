@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label"
 import RouteDayCard, { type RouteDraft } from "@/components/RouteDayCard"
 import { ArrowRight, CalendarDays, Plus } from "lucide-react"
 import { LUNCH_ALLOWANCE_PER_DAY } from "@shared/planCost"
+import NightOutAllowance, { type NightOutDraft } from "@/components/NightOutAllowance"
 
 type RoutePlanFormProps = {
   days: string[]
@@ -19,6 +20,9 @@ type RoutePlanFormProps = {
   totalCost: number
   isSubmitting: boolean
   isAuthenticated: boolean
+  nightOut: Record<string, NightOutDraft>
+  onNightOutChange: React.Dispatch<React.SetStateAction<Record<string, NightOutDraft>>>
+  nightOutCost?: number
   onWeekStartChange: (value: string) => void
   onToggleDay: (day: string) => void
   onRemoveVisit: (day: string, routeIndex: number) => void
@@ -40,6 +44,8 @@ export default function RoutePlanForm({
   isSubmitting,
   isAuthenticated,
   onWeekStartChange,
+  nightOut,
+  onNightOutChange,
   onToggleDay,
   onRemoveVisit,
   onChangeRoute,
@@ -100,6 +106,13 @@ export default function RoutePlanForm({
                 error={dayErrors[day]}
                 onRemove={() => onToggleDay(day)}
                 canRemove={activeDays.size > 1}
+                nightOut={nightOut[day] ?? blankNightOut()}
+                onNightOutChange={(patch) =>
+                  onNightOutChange(current => ({
+                    ...current,
+                    [day]: { ...(current[day] ?? blankNightOut()), ...patch },
+                  }))
+                }
                 onRemoveVisit={routeIndex => onRemoveVisit(day, routeIndex)}
                 onChange={(routeIndex, field, value) => onChangeRoute(day, routeIndex, field, value)}
               />
