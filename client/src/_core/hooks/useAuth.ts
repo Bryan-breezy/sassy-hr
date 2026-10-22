@@ -59,18 +59,13 @@ export function useAuth(options?: UseAuthOptions) {
 
   useEffect(() => {
     if (!redirectOnUnauthenticated) return;
-    if (meQuery.isLoading || logoutMutation.isPending) return;
+    if (meQuery.isLoading || meQuery.isFetching || logoutMutation.isPending) return;
+    if (meQuery.error) return;          // ← don't redirect on network/server errors
     if (state.user) return;
     if (typeof window === "undefined") return;
     if (window.location.pathname === "/login") return;
-
     window.location.href = "/login";
-  }, [
-    redirectOnUnauthenticated,
-    logoutMutation.isPending,
-    meQuery.isLoading,
-    state.user,
-  ]);
+  }, [redirectOnUnauthenticated, meQuery.isLoading, meQuery.isFetching, meQuery.error, logoutMutation.isPending, state.user]);
 
   return {
     ...state,
