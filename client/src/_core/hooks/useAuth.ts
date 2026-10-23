@@ -1,14 +1,14 @@
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation } from "wouter";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
 };
 
 export function useAuth(options?: UseAuthOptions) {
-  const navigate = useNavigate();
+  const [, navigate] = useLocation();
   const { redirectOnUnauthenticated = false } = options ?? {};
   const utils = trpc.useUtils();
 
