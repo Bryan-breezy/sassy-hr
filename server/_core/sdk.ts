@@ -104,18 +104,16 @@ class SDKServer {
   }
 
   async authenticateRequest(req: Request): Promise<User> {
-    // Prefer an explicit bearer token so a stale cookie from another account
-    // cannot override the session the client selected for this request.
+    // The HttpOnly cookie is the browser session source of truth. Older builds
+    // may still send a bearer token for the previous account during a switch.
+    const cookies = this.parseCookies(this.getHeader(req, "cookie"));
+    const cookieToken = cookies.get(COOKIE_NAME);
     const authHeader = this.getHeader(req, "authorization");
-    let sessionToken =
+    const bearerToken =
       typeof authHeader === "string" && authHeader.startsWith("Bearer ")
         ? authHeader.slice(7)
         : undefined;
-
-    if (!sessionToken) {
-      const cookies = this.parseCookies(this.getHeader(req, "cookie"));
-      sessionToken = cookies.get(COOKIE_NAME);
-    }
+    const sessionToken = cookieToken ?? bearerToken;
 
     const session = await this.verifySession(sessionToken);
 
