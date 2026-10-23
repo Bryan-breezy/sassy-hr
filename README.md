@@ -16,8 +16,10 @@ id | openId | username | name | email | role | loginMethod | lastSignedIn | crea
 `RoutePlans`
 
 ```text
-id | submittedBy | weekStart | totalCost | status | submittedAt | updatedAt
+id | submittedBy | weekStart | totalCost | status | submittedAt | updatedAt | submittedByOpenId
 ```
+
+If the sheet was created before account-based route ownership was added, add the `submittedByOpenId` header in cell `H1` of `RoutePlans`. New submissions use this account key to keep each user's plans isolated. Older rows without it remain visible only when their numeric owner ID maps to exactly one account.
 
 `RoutePlanDays`
 
@@ -52,3 +54,4 @@ pnpm install
 pnpm build
 pnpm start
 ```
+
