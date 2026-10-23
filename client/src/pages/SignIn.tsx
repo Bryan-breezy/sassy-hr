@@ -35,12 +35,6 @@ export default function SignIn() {
         return;
       }
 
-      if (data.token) {
-        try {
-          localStorage.setItem("app_session_token", data.token);
-        } catch {}
-      }
-
       // Refresh auth state then redirect according to role
       await utils.auth.me.invalidate();
       if (data.role === "admin") {
@@ -141,3 +135,4 @@ export default function SignIn() {
     </div>
   );
 }
+
