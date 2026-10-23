@@ -27,9 +27,10 @@ export const routePlanInputSchema = z.object(
   }
 )
 
-export function buildRoutePlanInsert(userId: number, input: z.infer<typeof routePlanInputSchema>) {
+export function buildRoutePlanInsert(userId: number, input: z.infer<typeof routePlanInputSchema>, userOpenId = "") {
   return {
     submittedBy: userId,
+    submittedByOpenId: userOpenId,
     weekStart: input.weekStart,
     // The total is always recomputed here (transport + fixed lunch allowance per day + any night out)
     // so the lunch money can't be altered by a client-supplied totalCost.
@@ -58,12 +59,13 @@ export const appRouter = router({
 
   routePlans: router({
     create: protectedProcedure.input(routePlanInputSchema).mutation(async ({ ctx, input }) => {
-      return createRoutePlan(buildRoutePlanInsert(ctx.user.id, input));
+      return createRoutePlan(buildRoutePlanInsert(ctx.user.id, input, ctx.user.openId));
     }),
-    mine: protectedProcedure.query(({ ctx }) => getRoutePlansForUser(ctx.user.id)),
+    mine: protectedProcedure.query(({ ctx }) => getRoutePlansForUser(ctx.user.id, ctx.user.openId)),
     all: adminProcedure.query(() => getAllRoutePlans()),
     markReviewed: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ input }) => markRoutePlanReviewed(input.id)),
   }),
 });
 
 export type AppRouter = typeof appRouter;
+
