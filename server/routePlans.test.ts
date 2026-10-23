@@ -1,6 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { appRouter, buildRoutePlanInsert, routePlanInputSchema } from "./routers";
 import type { TrpcContext } from "./_core/context";
+
+vi.mock("./db", () => ({
+  createRoutePlan: vi.fn(),
+  getAllRoutePlans: vi.fn().mockResolvedValue([]),
+  getRoutePlansForUser: vi.fn().mockResolvedValue([]),
+  markRoutePlanReviewed: vi.fn(),
+}));
 
 function context(user: TrpcContext["user"]): TrpcContext {
   return { user, req: {} as TrpcContext["req"], res: {} as TrpcContext["res"] };
@@ -73,3 +80,4 @@ describe("routePlans authorization", () => {
     await expect(caller.routePlans.create({ weekStart: "2026-08-24", totalCost: -1, dailyRoutes: [{ day: "Monday", from: "A", to: "B", plannedArrival: "18:00", departure: "08:00", transportMode: "Train" as never, cost: -1 }] })).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });
+
