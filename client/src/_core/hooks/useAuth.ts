@@ -1,12 +1,14 @@
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
 };
 
 export function useAuth(options?: UseAuthOptions) {
+  const navigate = useNavigate();
   const { redirectOnUnauthenticated = false } = options ?? {};
   const utils = trpc.useUtils();
 
@@ -29,27 +31,27 @@ export function useAuth(options?: UseAuthOptions) {
         error instanceof TRPCClientError &&
         error.data?.code === "UNAUTHORIZED"
       ) {
-        return;
+        // already logged out — continue to cleanup
+      } else {
+        throw error;
       }
-      throw error;
-    } finally {
-      try {
-        localStorage.removeItem("app_session_token");
-      } catch {}
-      utils.auth.me.setData(undefined, null);
-      await utils.auth.me.invalidate();
-      window.location.href = "/login";
     }
-  }, [logoutMutation, utils]);
 
-  const state = useMemo(() => {
-    return {
-      user: meQuery.data ?? null,
-      loading: meQuery.isLoading || logoutMutation.isPending,
-      error: meQuery.error ?? logoutMutation.error ?? null,
-      isAuthenticated: Boolean(meQuery.data),
-    };
-  }, [
+    try {
+      localStorage.removeItem("app_session_token");
+    } catch {}
+    utils.auth.me.setData(undefined, null);
+    await utils.auth.me.invalidate();
+    navigate("/login");
+  }, [logoutMutation.mutateAsync, utils, navigate]);
+
+  const state = useMemo(() => ({
+    user: meQuery.data ?? null,
+    loading: meQuery.isLoading,
+    loggingOut: logoutMutation.isPending,
+    error: meQuery.error ?? logoutMutation.error ?? null,
+    isAuthenticated: Boolean(meQuery.data),
+  }), [
     meQuery.data,
     meQuery.error,
     meQuery.isLoading,
@@ -60,12 +62,20 @@ export function useAuth(options?: UseAuthOptions) {
   useEffect(() => {
     if (!redirectOnUnauthenticated) return;
     if (meQuery.isLoading || meQuery.isFetching || logoutMutation.isPending) return;
-    if (meQuery.error) return;          // ← don't redirect on network/server errors
+    if (meQuery.error) return;
     if (state.user) return;
     if (typeof window === "undefined") return;
     if (window.location.pathname === "/login") return;
-    window.location.href = "/login";
-  }, [redirectOnUnauthenticated, meQuery.isLoading, meQuery.isFetching, meQuery.error, logoutMutation.isPending, state.user]);
+    navigate("/login");
+  }, [
+    redirectOnUnauthenticated,
+    meQuery.isLoading,
+    meQuery.isFetching,
+    meQuery.error,
+    logoutMutation.isPending,
+    state.user,
+    navigate,
+  ]);
 
   return {
     ...state,
