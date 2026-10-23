@@ -1,4 +1,4 @@
-import { COOKIE_NAME } from "@shared/const"
+import { COOKIE_NAME, LEGACY_COOKIE_NAME } from "@shared/const"
 import { getSessionCookieOptions } from "./_core/cookies"
 import { systemRouter } from "./_core/systemRouter"
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc"
@@ -51,6 +51,8 @@ export const appRouter = router({
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      ctx.res.clearCookie(LEGACY_COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      ctx.res.setHeader("Cache-Control", "private, no-store, max-age=0");
       return {
         success: true,
       } as const;
