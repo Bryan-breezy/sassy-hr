@@ -40,6 +40,10 @@ async function buildApp(): Promise<Express> {
 
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  app.use("/api", (_req, res, next) => {
+    res.setHeader("Cache-Control", "private, no-store, max-age=0");
+    next();
+  });
   registerStorageProxy(app);
   registerLocalAuthRoutes(app);
 
