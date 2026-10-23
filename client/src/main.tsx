@@ -7,6 +7,12 @@ import superjson from "superjson";
 import App from "./App";
 import "./index.css";
 
+// Older builds persisted bearer tokens in localStorage. They could outlive an
+// account switch and override the newly issued HttpOnly session cookie.
+try {
+  localStorage.removeItem("app_session_token");
+} catch {}
+
 const queryClient = new QueryClient();
 
 // After a new release, a tab that was already open still points at old script file names, which no
@@ -56,15 +62,6 @@ const trpcClient = trpc.createClient({
     httpBatchLink({
       url: "/api/trpc",
       transformer: superjson,
-      headers() {
-        try {
-          const token = localStorage.getItem("app_session_token");
-          if (token) {
-            return { Authorization: `Bearer ${token}` };
-          }
-        } catch {}
-        return {};
-      },
       fetch(input, init) {
         return globalThis.fetch(input, {
           ...(init ?? {}),
@@ -82,3 +79,4 @@ createRoot(document.getElementById("root")!).render(
     </QueryClientProvider>
   </trpc.Provider>
 );
+
