@@ -17,6 +17,7 @@ type UserRow = {
 type PlanRow = {
   id: number;
   submittedBy: number;
+  submittedByOpenId?: string;
   weekStart: string;
   totalCost: string;
   status: "submitted" | "reviewed";
@@ -100,7 +101,7 @@ function mapUser(row: string[]): UserRow {
 }
 
 function mapPlan(row: string[]): PlanRow {
-  return { id: asNumber(row[0]), submittedBy: asNumber(row[1]), weekStart: row[2] ?? "", totalCost: row[3] ?? "0", status: row[4] === "reviewed" ? "reviewed" : "submitted", submittedAt: row[5] ?? "", updatedAt: row[6] ?? "" };
+  return { id: asNumber(row[0]), submittedBy: asNumber(row[1]), weekStart: row[2] ?? "", totalCost: row[3] ?? "0", status: row[4] === "reviewed" ? "reviewed" : "submitted", submittedAt: row[5] ?? "", updatedAt: row[6] ?? "", submittedByOpenId: row[7] || undefined };
 }
 
 function mapDailyRoute(row: string[]): DailyRoute {
@@ -112,7 +113,7 @@ async function getUsers() {
 }
 
 async function getPlans() {
-  return (await readRows("RoutePlans!A2:G")).filter(row => row.length).map(mapPlan);
+  return (await readRows("RoutePlans!A2:H")).filter(row => row.length).map(mapPlan);
 }
 
 async function getDays() {
@@ -158,11 +159,11 @@ async function withDailyRoutes(plans: PlanRow[]) {
   return plans.map(plan => ({ ...plan, dailyRoutes: days.filter(day => day.routePlanId === plan.id) }));
 }
 
-export async function createRoutePlan(plan: { submittedBy: number; weekStart: string; totalCost: string; routeDetails: DailyRoute[] }) {
+export async function createRoutePlan(plan: { submittedBy: number; submittedByOpenId: string; weekStart: string; totalCost: string; routeDetails: DailyRoute[] }) {
   const plans = await getPlans();
   const id = plans.reduce((max, item) => Math.max(max, item.id), 0) + 1;
   const timestamp = nowIso();
-  await appendRow("RoutePlans!A:G", [id, plan.submittedBy, plan.weekStart, plan.totalCost, "submitted", timestamp, timestamp]);
+  await appendRow("RoutePlans!A:H", [id, plan.submittedBy, plan.weekStart, plan.totalCost, "submitted", timestamp, timestamp, plan.submittedByOpenId]);
   const days = await getDays();
   let nextDayId = days.reduce((max, item) => Math.max(max, item.id ?? 0), 0) + 1;
   for (const route of plan.routeDetails) {
@@ -171,15 +172,39 @@ export async function createRoutePlan(plan: { submittedBy: number; weekStart: st
   return { id };
 }
 
-export async function getRoutePlansForUser(userId: number) {
-  return withDailyRoutes((await getPlans()).filter(plan => plan.submittedBy === userId).sort((a, b) => b.weekStart.localeCompare(a.weekStart)));
+export function filterRoutePlansForUser<T extends { submittedBy: number; submittedByOpenId?: string }, U extends { id: number; openId: string }>(
+  plans: T[],
+  users: U[],
+  user: { id: number; openId: string },
+) {
+  const matchingUsers = users.filter(candidate => candidate.id === user.id);
+  const hasUniqueLegacyId = matchingUsers.length === 1 && matchingUsers[0].openId === user.openId;
+
+  return plans.filter(plan => plan.submittedByOpenId
+    ? plan.submittedByOpenId === user.openId
+    : hasUniqueLegacyId && plan.submittedBy === user.id);
+}
+
+export async function getRoutePlansForUser(userId: number, openId: string) {
+  const [plans, users] = await Promise.all([getPlans(), getUsers()]);
+  const ownedPlans = filterRoutePlansForUser(plans, users, { id: userId, openId });
+  return withDailyRoutes(ownedPlans.sort((a, b) => b.weekStart.localeCompare(a.weekStart)));
 }
 
 export async function getAllRoutePlans() {
   const users = await getUsers();
-  const userMap = new Map(users.map(user => [user.id, user]));
+  const usersById = new Map<number, UserRow | null>();
+  for (const user of users) {
+    usersById.set(user.id, usersById.has(user.id) ? null : user);
+  }
+  const userMapByOpenId = new Map(users.map(user => [user.openId, user]));
   const plans = (await getPlans()).sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
-  return (await withDailyRoutes(plans)).map(plan => ({ ...plan, merchandizerName: userMap.get(plan.submittedBy)?.name ?? null, merchandizerEmail: userMap.get(plan.submittedBy)?.email ?? null }));
+  return (await withDailyRoutes(plans)).map(plan => {
+    const owner = plan.submittedByOpenId
+      ? userMapByOpenId.get(plan.submittedByOpenId)
+      : usersById.get(plan.submittedBy);
+    return { ...plan, merchandizerName: owner?.name ?? null, merchandizerEmail: owner?.email ?? null };
+  });
 }
 
 export async function markRoutePlanReviewed(id: number) {
@@ -190,3 +215,4 @@ export async function markRoutePlanReviewed(id: number) {
   await updateRow(`RoutePlans!A${rowNumber}:G${rowNumber}`, [existing.id, existing.submittedBy, existing.weekStart, existing.totalCost, "reviewed", existing.submittedAt, nowIso()]);
   return { success: true };
 }
+
