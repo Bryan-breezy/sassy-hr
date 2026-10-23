@@ -1,4 +1,4 @@
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { COOKIE_NAME, LEGACY_COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import type { Express, Request, Response } from "express";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
@@ -108,8 +108,10 @@ function clearLoginAttempts(key: string) {
 async function createSession(res: Response, req: Request, openId: string, name: string, role: "user" | "admin") {
   const sessionToken = await sdk.createSessionToken(openId, { name, expiresInMs: ONE_YEAR_MS });
   const cookieOptions = getSessionCookieOptions(req);
+  res.clearCookie(LEGACY_COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
   res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-  res.json({ ok: true, role, token: sessionToken });
+  res.setHeader("Cache-Control", "private, no-store, max-age=0");
+  res.json({ ok: true, role });
 }
 
 export function registerLocalAuthRoutes(app: Express) {
