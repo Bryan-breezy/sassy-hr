@@ -31,14 +31,20 @@ export type RoutePlanPdfOptions = {
   reviewedOn?: Date | string
 }
 
-type LoadedLogo = { dataUrl: string; width: number; height: number }
+type LoadedLogo = { 
+  dataUrl: string; 
+  width: number; 
+  height: number 
+}
 
 /** Fetches the logo and reads its natural size so it can be drawn without distortion. */
 async function loadLogo(src: string): Promise<LoadedLogo | null> {
   try {
     const response = await fetch(src)
     if (!response.ok) return null
+
     const blob = await response.blob()
+
     const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = () => resolve(String(reader.result))
@@ -73,10 +79,11 @@ function formatMoney(value: string | number | undefined) {
 }
 
 export function routePlanPdfFileName(plan: RoutePlanPdfPlan) {
-  const who = plan.merchandizerName || plan.merchandizerEmail || `merchandiser_${plan.submittedBy}`
-  // For an email fallback use just the part before "@", and cap the length so file names stay manageable.
-  const base = who.includes("@") ? who.split("@")[0] : who
-  const safe = base.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "").toLowerCase().slice(0, 40)
+  const who = plan.merchandizerName || `merchandiser_${plan.submittedBy}`
+  const safe = who.replace(/[^a-z0-9]+/gi, "_") // replace non-alphanumeric with underscores
+                  .replace(/^_+|_+$/g, "") // trim leading/trailing underscores
+                  .toLowerCase()
+                  .slice(0, 40) // limit to 40 chars to avoid long filenames
   return `${safe}_${plan.weekStart}.pdf`
 }
 
@@ -91,7 +98,8 @@ export async function downloadRoutePlanPdf(plan: RoutePlanPdfPlan, options: Rout
     loadLogo(CONFIG.logo.src),
   ])
 
-  const doc = new jsPDF({ unit: "mm", format: CONFIG.pageSize, orientation: CONFIG.orientation })
+  const doc = new jsPDF(
+    { unit: "mm", format: CONFIG.pageSize, orientation: CONFIG.orientation })
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
   const margin = CONFIG.margin
@@ -99,7 +107,7 @@ export async function downloadRoutePlanPdf(plan: RoutePlanPdfPlan, options: Rout
   const [ar, ag, ab] = CONFIG.accent
 
   const merchandiser =
-    plan.merchandizerName || plan.merchandizerEmail || `Merchandiser #${plan.submittedBy}`
+    plan.merchandizerName || `Merchandiser #${plan.submittedBy}`
   const routes = plan.dailyRoutes ?? []
 
   // ---- Header: logo (kept in proportion inside the configured box) + titles ----
@@ -132,7 +140,6 @@ export async function downloadRoutePlanPdf(plan: RoutePlanPdfPlan, options: Rout
   const isReviewed = plan.status === "reviewed"
   const details: [string, string][] = [
     ["Merchandiser", merchandiser],
-    ["Email", plan.merchandizerEmail || "-"],
     ["Merchandiser ID", String(plan.submittedBy)],
     ["Week commencing", plan.weekStart],
     ["Submitted on", formatDateTime(plan.submittedAt)],
@@ -163,20 +170,30 @@ export async function downloadRoutePlanPdf(plan: RoutePlanPdfPlan, options: Rout
   // ---- Route table ----
   const columns = CONFIG.columns
   const costIndex = columns.findIndex((c) => c.key === "cost")
-  // Cost summary rows. The label spans every column before "cost", then the amount, then any trailing
-  // columns blank. The breakdown (transport / lunch / night out) is only shown when it adds up to the saved
+  // transport / lunch / night out is only shown when it adds up to the saved
   // total, so older plans that never had lunch money still print just their total.
   const costs = computePlanCosts(routes)
-  const showBreakdown = routes.length > 0 && Math.abs(Number(plan.totalCost) - costs.totalCost) < 0.01
+  const showBreakdown = routes.length > 0 && 
+    Math.abs(Number(plan.totalCost) - costs.totalCost) < 0.01
+
   const trailingBlanks = Math.max(columns.length - costIndex - 1, 0)
+  
   const footLine = (label: string, amount: number | string, strong: boolean): RowInput => {
     const fontStyle = strong ? ("bold" as const) : ("normal" as const)
     return [
-      { content: label, colSpan: costIndex, styles: { halign: "right" as const, fontStyle } },
-      { content: formatMoney(amount), styles: { fontStyle } },
+      { 
+        content: label, 
+        colSpan: costIndex, 
+        styles: { halign: "right" as const, fontStyle } 
+      },
+      { 
+        content: formatMoney(amount), 
+        styles: { fontStyle } 
+      },
       ...Array<string>(trailingBlanks).fill(""),
     ]
   }
+
   const footRows: RowInput[] | undefined =
     costIndex > 0
       ? [
@@ -209,11 +226,22 @@ export async function downloadRoutePlanPdf(plan: RoutePlanPdfPlan, options: Rout
             return String(value ?? "")
           })
         )
-      : [[{ content: "No route days recorded", colSpan: columns.length, styles: { halign: "center" } }]],
+      : [[{ 
+        content: "No route days recorded", 
+          colSpan: columns.length, 
+          styles: { halign: "center" } 
+        }]],
     foot: footRows,
     showFoot: "lastPage",
     theme: "grid",
-    styles: { font: "helvetica", fontSize: 9, cellPadding: 2.5, lineColor: [215, 221, 227], lineWidth: 0.2, textColor: [34, 48, 71] },
+    styles: { 
+      font: "helvetica", 
+      fontSize: 9, 
+      cellPadding: 2.5, 
+      lineColor: [215, 221, 227], 
+      lineWidth: 0.2, 
+      textColor: [34, 48, 71] 
+    },
     headStyles: { fillColor: [pr, pg, pb], textColor: 255, fontStyle: "bold" },
     footStyles: { fillColor: [244, 247, 250], textColor: [pr, pg, pb], fontStyle: "bold" },
     alternateRowStyles: { fillColor: [250, 252, 253] },

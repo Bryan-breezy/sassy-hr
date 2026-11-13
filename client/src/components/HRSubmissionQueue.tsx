@@ -54,7 +54,7 @@ export default function HRSubmissionQueue({ plans, selectedId, search, filter, o
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="font-semibold text-sm text-[#1e2f41]">{plan.merchandizerName || plan.merchandizerEmail || `Merchandiser #${plan.submittedBy}`}</div>
+                  <div className="font-semibold text-sm text-[#1e2f41]">{plan.merchandizerName || `Merchandiser #${plan.submittedBy}`}</div>
                   <div className="text-xs text-[#788796] mt-1">Week of {plan.weekStart}</div>
                 </div>
                 <span className={`text-[10px] uppercase tracking-[.1em] font-bold rounded-full px-2.5 py-1 ${plan.status === "reviewed" ? "bg-[#e2f0e6] text-[#4e7b5e]" : "bg-[#fff0d8] text-[#9a6b21]"}`}>

@@ -3,6 +3,9 @@ import HRSubmissionDetails from "@/components/HRSubmissionDetails"
 import HRSubmissionQueue from "@/components/HRSubmissionQueue"
 import { HRHeader, HRSidebar } from "@/components/HRChrome"
 import type { HRPlan, PlanFilter } from "@/lib/hrTypes"
+import type { computePlanCosts } from "@shared/planCost"
+
+type PlanCostBreakdown = ReturnType<typeof computePlanCosts>
 
 export default function HRDashboard({
   displayName,
@@ -14,6 +17,7 @@ export default function HRDashboard({
   reviewed,
   visiblePlans,
   selected,
+  selectedBreakdown,
   search,
   filter,
   onSearchChange,
@@ -35,6 +39,7 @@ export default function HRDashboard({
   reviewed: number
   visiblePlans: HRPlan[]
   selected?: HRPlan
+  selectedBreakdown: PlanCostBreakdown | null
   search: string
   filter: PlanFilter
   onSearchChange: (value: string) => void
@@ -66,6 +71,7 @@ export default function HRDashboard({
             />
             <HRSubmissionDetails
               selected={selected}
+              selectedBreakdown={selectedBreakdown}
               confirmReviewOpen={confirmReviewOpen}
               isMarkingReviewed={isMarkingReviewed}
               onConfirmReviewChange={onConfirmReviewChange}

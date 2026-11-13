@@ -12,9 +12,14 @@ import {
 } from "@/components/ui/alert-dialog"
 import { CheckCircle2, FileText } from "lucide-react"
 import type { HRPlan } from "@/lib/hrTypes"
+import { LUNCH_ALLOWANCE_PER_DAY } from "@shared/planCost"
+import type { computePlanCosts } from "@shared/planCost"
+
+type PlanCostBreakdown = ReturnType<typeof computePlanCosts>
 
 export default function HRSubmissionDetails({
   selected,
+  selectedBreakdown,
   confirmReviewOpen,
   isMarkingReviewed,
   onConfirmReviewChange,
@@ -22,6 +27,7 @@ export default function HRSubmissionDetails({
   onDownloadReviewedPlan,
 }: {
   selected?: HRPlan
+  selectedBreakdown: PlanCostBreakdown | null
   confirmReviewOpen: boolean
   isMarkingReviewed: boolean
   onConfirmReviewChange: (open: boolean) => void
@@ -33,10 +39,12 @@ export default function HRSubmissionDetails({
       <div className="p-5 sm:p-7 border-b border-[#e8edf2] flex items-start justify-between gap-4">
         <div>
           <div className="text-xs uppercase tracking-[.16em] text-[#8b6a32] font-bold">Plan Details</div>
-          <h2 className="text-2xl font-bold tracking-tight text-[#1b2b3d] mt-1">{selected ? `Week of ${selected.weekStart}` : "Select a submission"}</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-[#1b2b3d] mt-1">
+            {selected ? `Week of ${selected.weekStart}` : "Select a submission"}
+          </h2>
           {selected && (
             <p className="text-sm text-[#748292] mt-1">
-              Submitted by <span className="font-medium text-[#1e2f41]">{selected.merchandizerName || selected.merchandizerEmail || `Merchandiser #${selected.submittedBy}`}</span>
+              Submitted by <span className="font-medium text-[#1e2f41]">{selected.merchandizerName || `Merchandiser #${selected.submittedBy}`}</span>
             </p>
           )}
         </div>
@@ -54,8 +62,8 @@ export default function HRSubmissionDetails({
               <AlertDialogTitle>Mark this route plan as reviewed?</AlertDialogTitle>
               <AlertDialogDescription>
                 {selected && <>
-                  This updates the status for <span className="font-medium text-[#1e2f41]">{selected.merchandizerName || selected.merchandizerEmail || `Merchandiser #${selected.submittedBy}`}</span>
-                  's week commencing {selected.weekStart} in Google Sheets, and immediately downloads a PDF review report with the merchandiser&apos;s details. This can&apos;t be undone from here.
+                  This updates the status for <span className="font-medium text-[#1e2f41]">{selected.merchandizerName || `Merchandiser #${selected.submittedBy}`}</span>
+                  's week commencing {selected.weekStart} in Google Sheets. This can&apos;t be undone from here.
                 </>}
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -84,9 +92,16 @@ export default function HRSubmissionDetails({
             <div>
               <div className="text-xs uppercase tracking-[.12em] text-[#718496] font-medium">Total Estimated Budget</div>
               <div className="text-2xl font-bold text-[#1f354d] mt-0.5">Ksh {Number(selected.totalCost).toFixed(2)}</div>
+              {selectedBreakdown && (
+                <div className="mt-1 text-xs text-[#718496]">
+                  Transport Ksh {selectedBreakdown.transportCost.toFixed(2)} + Lunch Ksh {selectedBreakdown.lunchCost.toFixed(2)}
+                  {` (${selectedBreakdown.daysWithData} × ${LUNCH_ALLOWANCE_PER_DAY})`}
+                  {selectedBreakdown.nightOutCost > 0 && ` + Night out Ksh ${selectedBreakdown.nightOutCost.toFixed(2)}`}
+                </div>
+              )}
             </div>
             <div className="text-right">
-              <div className="text-xs uppercase tracking-[.12em] text-[#718496] font-medium">Route Days</div>
+              <div className="text-xs uppercase tracking-[.12em] text-[#718496] font-medium">NUMBER OF VISITS</div>
               <div className="text-2xl font-bold text-[#1f354d] mt-0.5">{selected.dailyRoutes?.length || 0}</div>
             </div>
           </div>
@@ -106,6 +121,11 @@ export default function HRSubmissionDetails({
                   <span>Arrive {route.plannedArrival} · Depart {route.departure}</span>
                   <span className="font-medium text-[#465b6f]">{route.transportMode}</span>
                 </div>
+                {Number(route.nightOutCost) > 0 && (
+                  <div className="mt-2 text-xs font-semibold text-[#8b6a32]">
+                    Night out · Ksh {Number(route.nightOutCost).toFixed(2)}
+                  </div>
+                )}
               </div>
             ))}
           </div>
