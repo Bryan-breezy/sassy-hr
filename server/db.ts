@@ -154,9 +154,16 @@ export async function getUserByOpenId(openId: string) {
   return (await getUsers()).find(user => user.openId === openId);
 }
 
-async function withDailyRoutes(plans: PlanRow[]) {
-  const days = await getDays();
-  return plans.map(plan => ({ ...plan, dailyRoutes: days.filter(day => day.routePlanId === plan.id) }));
+function withDailyRoutes(plans: PlanRow[], days: DailyRoute[]) {
+  const daysByPlan = new Map<number, DailyRoute[]>();
+  for (const day of days) {
+    if (day.routePlanId == null) continue;
+    const planDays = daysByPlan.get(day.routePlanId) ?? [];
+    planDays.push(day);
+    daysByPlan.set(day.routePlanId, planDays);
+  }
+
+  return plans.map(plan => ({ ...plan, dailyRoutes: daysByPlan.get(plan.id) ?? [] }));
 }
 
 export async function createRoutePlan(plan: { submittedBy: number; submittedByOpenId: string; weekStart: string; totalCost: string; routeDetails: DailyRoute[] }) {
@@ -186,20 +193,19 @@ export function filterRoutePlansForUser<T extends { submittedBy: number; submitt
 }
 
 export async function getRoutePlansForUser(userId: number, openId: string) {
-  const [plans, users] = await Promise.all([getPlans(), getUsers()]);
+  const [plans, users, days] = await Promise.all([getPlans(), getUsers(), getDays()]);
   const ownedPlans = filterRoutePlansForUser(plans, users, { id: userId, openId });
-  return withDailyRoutes(ownedPlans.sort((a, b) => b.weekStart.localeCompare(a.weekStart)));
+  return withDailyRoutes(ownedPlans.sort((a, b) => b.weekStart.localeCompare(a.weekStart)), days);
 }
 
 export async function getAllRoutePlans() {
-  const users = await getUsers();
+  const [users, plans, days] = await Promise.all([getUsers(), getPlans(), getDays()]);
   const usersById = new Map<number, UserRow | null>();
   for (const user of users) {
     usersById.set(user.id, usersById.has(user.id) ? null : user);
   }
   const userMapByOpenId = new Map(users.map(user => [user.openId, user]));
-  const plans = (await getPlans()).sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
-  return (await withDailyRoutes(plans)).map(plan => {
+  return withDailyRoutes(plans.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)), days).map(plan => {
     const owner = plan.submittedByOpenId
       ? userMapByOpenId.get(plan.submittedByOpenId)
       : usersById.get(plan.submittedBy);

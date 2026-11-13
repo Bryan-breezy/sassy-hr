@@ -3,11 +3,12 @@ import PlanRow from "@/components/PlanRow"
 
 type RecentSubmissionsProps = {
   plans: any[]
+  isLoading: boolean
   openPlan: number | null
   onSetOpenPlan: (id: number | null) => void
 }
 
-export default function RecentSubmissions({ plans, openPlan, onSetOpenPlan }: RecentSubmissionsProps) {
+export default function RecentSubmissions({ plans, isLoading, openPlan, onSetOpenPlan }: RecentSubmissionsProps) {
   return (
     <section className="mt-12">
       <div className="flex items-end justify-between mb-5">
@@ -18,7 +19,12 @@ export default function RecentSubmissions({ plans, openPlan, onSetOpenPlan }: Re
       </div>
       <Card className="border-0 shadow-sm rounded-3xl overflow-hidden">
         <CardContent className="p-0">
-          {!plans.length ?
+          {isLoading ?
+            <div role="status" aria-label="Loading recent submissions" className="space-y-px">
+              {[0, 1, 2].map(index => (
+                <div key={index} aria-hidden="true" className="h-20 animate-pulse motion-reduce:animate-none border-b border-[#edf0eb] bg-[#f6f7f4]" />
+              ))}
+            </div> : !plans.length ?
             <div className="p-8 text-center text-[#718278]">Your submitted weekly plans will appear here.</div> :
             <div className="divide-y divide-[#edf0eb]">
               {plans.map(plan => (

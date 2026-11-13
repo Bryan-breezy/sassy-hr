@@ -14,7 +14,7 @@ export default function Home() {
   const routePlan = useRoutePlan(isAuthenticated)
   const mine = trpc.routePlans.mine.useQuery(undefined, { enabled: isAuthenticated })
 
-  if (loading || !isAuthenticated || mine.isLoading) return <PageSkeleton page="home" />
+  if (loading || !isAuthenticated) return <PageSkeleton page="home" />
 
   return (
     <div className="min-h-screen bg-[#f6f7f4] text-[#18352f]">
@@ -62,6 +62,7 @@ export default function Home() {
         </div>
         <RecentSubmissions
           plans={mine.data || []}
+          isLoading={mine.isLoading}
           openPlan={openPlan}
           onSetOpenPlan={setOpenPlan}
         />
