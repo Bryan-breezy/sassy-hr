@@ -210,7 +210,7 @@ export async function downloadRoutePlanPdf(plan: RoutePlanPdfPlan, options: Rout
                   : []),
               ]
             : []),
-          footLine("Total estimated cost", plan.totalCost, true),
+          footLine("Total cost", plan.totalCost, true),
         ]
       : undefined
   autoTable(doc, {
