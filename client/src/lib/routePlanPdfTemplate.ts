@@ -10,7 +10,7 @@ export const ROUTE_PLAN_PDF_CONFIG = {
   },
 
   // Colors (RGB 0–255)
-  primary:  [20, 63, 55]
+  primary:  [20, 63, 55],
   accent: [209, 164, 91], // gold
 
   // Page
