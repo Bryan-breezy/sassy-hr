@@ -88,8 +88,8 @@ export default function HR() {
             plan.status,
             Number(plan.totalCost).toFixed(2),
             route.day,
-            `"${(route.from || "").replace(/"/g, '""')}"`,
-            `"${(route.to || "").replace(/"/g, '""')}"`,
+            route.from || "",
+            route.to || "",
             route.plannedArrival,
             route.departure,
             route.transportMode,
@@ -116,15 +116,24 @@ export default function HR() {
       }
     })
 
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [headers.join(","), ...rows.map((row) => row.join(","))].join("\n")
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map((value) => `"${value.replace(/"/g, '""')}"`).join(","))
+      .join("\r\n")
+    const blob = new Blob(["\uFEFF", csvContent], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
     const link = document.createElement("a")
-    link.setAttribute("href", encodeURI(csvContent))
-    link.setAttribute("download", `merchandiser_routes_${new Date().toISOString().slice(0, 10)}.csv`)
+    const now = new Date()
+    const localDate = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, "0"),
+      String(now.getDate()).padStart(2, "0"),
+    ].join("-")
+    link.setAttribute("href", url)
+    link.setAttribute("download", `Route_plan_${localDate}.csv`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+    window.setTimeout(() => URL.revokeObjectURL(url), 0)
     toast.success("CSV export downloaded successfully")
   }
 
